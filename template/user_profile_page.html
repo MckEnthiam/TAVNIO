@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Profil</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 0;
+        }
+
+        .glass-container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 50px 60px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 1;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .profile-photo {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .profile-stats {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        .rating-stars {
+            color: #ffd700;
+            font-size: 1.3rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .balance-highlight {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 10px;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .history-info {
+            flex: 1;
+        }
+
+        .history-title {
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .history-date {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
+        .history-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .badge-completed {
+            background: #10b981;
+            color: white;
+        }
+
+        .badge-in-progress {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .settings-button {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 18px 25px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: left;
+        }
+
+        .settings-button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
+        }
+
+        .edit-button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .edit-button:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .back-button {
+            width: 100%;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .glass-container {
+                padding: 40px 30px;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .profile-name {
+                font-size: 2rem;
+            }
+
+            .profile-stats {
+                justify-content: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .history-item {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .glass-container {
+                padding: 30px 20px;
+            }
+
+            .profile-photo {
+                width: 120px;
+                height: 120px;
+            }
+
+            .profile-name {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-container">
+        <div class="profile-header">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80" alt="Photo de profil" class="profile-photo">
+            <div class="profile-info">
+                <h1 class="profile-name">Jean Dupont</h1>
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <span class="rating-stars">⭐⭐⭐⭐⭐</span>
+                        <span>4.8/5</span>
+                    </div>
+                    <div class="stat-item">
+                        📅 Membre depuis Mars 2024
+                    </div>
+                </div>
+                <button class="edit-button" onclick="editProfile()">✏️ Modifier le profil</button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-icon">💰</span>
+                <div class="stat-label">Solde disponible</div>
+                <div class="stat-value balance-highlight">25 500 FCFA</div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-icon">✅</span>
+                <div class="stat-label">Quêtes complétées</div>
+                <div class="stat-value">42</div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-icon">🔄</span>
+                <div class="stat-label">Quêtes en cours</div>
+                <div class="stat-value">3</div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-icon">📝</span>
+                <div class="stat-label">Quêtes publiées</div>
+                <div class="stat-value">15</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📜 Historique des quêtes</h2>
+            
+            <div class="history-item">
+                <div class="history-info">
+                    <div class="history-title">🚚 Livraison de colis urgent</div>
+                    <div class="history-date">10 Novembre 2025 • 5 000 FCFA</div>
+                </div>
+                <span class="history-badge badge-completed">✓ Terminée</span>
+            </div>
+
+            <div class="history-item">
+                <div class="history-info">
+                    <div class="history-title">🛒 Courses au marché</div>
+                    <div class="history-date">8 Novembre 2025 • 3 500 FCFA</div>
+                </div>
+                <span class="history-badge badge-completed">✓ Terminée</span>
+            </div>
+
+            <div class="history-item">
+                <div class="history-info">
+                    <div class="history-title">💻 Saisie de données</div>
+                    <div class="history-date">12 Novembre 2025 • 8 000 FCFA</div>
+                </div>
+                <span class="history-badge badge-in-progress">⏳ En cours</span>
+            </div>
+
+            <div class="history-item">
+                <div class="history-info">
+                    <div class="history-title">🤝 Aide au déménagement</div>
+                    <div class="history-date">5 Novembre 2025 • 12 000 FCFA</div>
+                </div>
+                <span class="history-badge badge-completed">✓ Terminée</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⚙️ Paramètres</h2>
+            <div class="settings-list">
+                <button class="settings-button" onclick="openSettings('account')">
+                    👤 Informations du compte
+                </button>
+                <button class="settings-button" onclick="openSettings('notifications')">
+                    🔔 Notifications
+                </button>
+                <button class="settings-button" onclick="openSettings('payment')">
+                    💳 Méthodes de paiement
+                </button>
+                <button class="settings-button" onclick="openSettings('security')">
+                    🔒 Sécurité et confidentialité
+                </button>
+                <button class="settings-button" onclick="openSettings('help')">
+                    ❓ Aide et support
+                </button>
+            </div>
+        </div>
+
+        <button class="back-button" onclick="goBack()">← Retour à l'accueil</button>
+    </div>
+
+    <script>
+        function editProfile() {
+            alert('Modification du profil en cours de développement...');
+        }
+
+        function openSettings(type) {
+            const messages = {
+                account: 'Paramètres du compte',
+                notifications: 'Paramètres des notifications',
+                payment: 'Méthodes de paiement',
+                security: 'Sécurité et confidentialité',
+                help: 'Aide et support'
+            };
+            alert(`Ouverture de : ${messages[type]}`);
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+    </script>
+</body>
+</html>

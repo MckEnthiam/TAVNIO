@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TAVNO — Quêtes</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <video autoplay muted loop id="bgVideo" class="bg-video" playbackRate="0.75">
+    <source src="/bg.mp4" type="video/mp4">
+  </video>
+  <header class="navbar">
+    <div class="brand" onclick="navigate('home')">🗺️ TAVNO</div>
+    <nav class="nav">
+      <button class="nav-btn" data-target="home">Accueil</button>
+      <button class="nav-btn" data-target="explore">Explorer</button>
+      <button class="nav-btn" data-target="publish">Publier</button>
+       <button class="nav-btn" data-target="about">À propos</button>
+    </nav>
+    <div class="auth">
+      <button id="loginBtn">Se connecter</button>
+      <button id="signupBtn">S'inscrire</button>
+      <div id="userMenu" class="user-menu hidden"></div>
+    </div>
+  </header>
+<section id="login" class="page auth-page">
+  <div class="auth-container">
+    <div class="panel auth">
+      <h2>Connexion</h2>
+      <form id="loginForm">
+        <label>Email <input type="email" name="email" required></label>
+        <label>Mot de passe <input type="password" name="password" required></label>
+        <div class="form-actions">
+          <button class="primary" type="submit">Connexion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section id="signup" class="page auth-page">
+  <div class="auth-container">
+    <div class="panel auth">
+      <h2>Inscription</h2>
+      <form id="signupForm">
+        <label>Nom d'utilisateur <input type="text" name="username" placeholder="Choisissez votre pseudo" required></label>
+        <label>Email <input type="email" name="email" placeholder="votre@email.com" required></label>
+        <label>Numéro de téléphone (international) <input type="tel" name="phone" placeholder="+22890000000"></label>
+        <label>Mot de passe <input type="password" name="password" placeholder="Au moins 6 caractères" required></label>
+        <label>Confirmer le mot de passe <input type="password" name="confirmPassword" placeholder="Confirmez votre mot de passe" required></label>
+        <div class="form-actions">
+          <button class="primary" type="submit">Créer un compte</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+  <main id="app" class="container">
+    <section id="home" class="page active">
+      <h1 align="center">TAVNO</h1>
+      <p align="center">Publiez ou effectuez des quêtes pour gagner des récompenses.</p><br/>
+      <div class="hero-actions">
+        <button align="center" class="primary" onclick="navigate('publish')">Publier une quête</button>
+        <button align="center" onclick="navigate('explore')">Découvrir les quêtes</button>
+      </div>
+    </section>
+
+    <section id="explore" class="page">
+      <div class="panel explore">
+        <div class="explore-header">
+          <input id="searchInput" placeholder="Chercher une quête...">
+          <select id="categorySelect">
+            <option value="">Toutes catégories</option>
+            <option value="transport">Transport</option>
+            <option value="achats">Achats</option>
+            <option value="aide">Aide</option>
+            <option value="publicite">Publicité</option>
+            <option value="enligne">En ligne</option>
+          </select>
+        </div>
+        <div id="questsGrid" class="grid"></div>
+      </div>
+    </section>
+
+    <section id="publish" class="page">
+      <div class="panel publish">
+        <h2>Publier une quête</h2>
+        <form id="publishForm">
+          <label>Titre <input name="title" required></label>
+          <label>Description <textarea name="description" required></textarea></label>
+          <label>Catégorie <select name="category" required>
+            <option value="transport">Transport</option>
+            <option value="achats">Achats</option>
+            <option value="aide">Aide</option>
+            <option value="publicite">Publicité</option>
+            <option value="enligne">En ligne</option>
+          </select></label>
+          <label>Récompense (FCFA) <input type="number" name="reward" required></label>
+          <label>Nombre de slots <input type="number" name="slots" min="1" value="1" required></label>
+          <label>Durée <input name="duration"></label>
+          <label>Lieu <input name="location"></label>
+          <label>Image <input type="file" name="image" accept="image/*"></label>
+          <div class="form-actions">
+            <button type="submit" class="primary">Publier</button>
+            <button type="button" onclick="navigate('home')">Annuler</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="about" class="page">
+      <div class="panel about">
+        <h2>À propos de TAVNO</h2>
+        
+        <div class="about-section">
+          <h3>🎯 Notre Mission</h3>
+          <p>TAVNO est une plateforme innovante de marché de quêtes qui connecte des personnes ayant des besoins avec celles possédant les compétences et la disponibilité pour les satisfaire. Nous croyons en la puissance de la collaboration communautaire et de l'entraide.</p>
+        </div>
+
+        <div class="about-section">
+          <h3>✨ Caractéristiques Principales</h3>
+          <ul class="about-list">
+            <li>📝 <strong>Publiez vos quêtes</strong> - Créez et partagez des tâches que vous avez besoin d'accomplir</li>
+            <li>🔍 <strong>Découvrez des opportunités</strong> - Parcourez les quêtes disponibles par catégorie</li>
+            <li>💰 <strong>Gagnez des récompenses</strong> - Acceptez des quêtes et gagnez des points</li>
+            <li>👤 <strong>Profil personnalisé</strong> - Créez votre identité avec une photo et une bio</li>
+            <li>🏷️ <strong>Catégories variées</strong> - Transport, Achats, Aide, Publicité, En ligne</li>
+          </ul>
+        </div>
+
+        <div class="about-section">
+          <h3>🌍 Qui peut utiliser TAVNO?</h3>
+          <p>TAVNO est conçu pour tous! Que vous soyez une personne cherchant de l'aide, un étudiant cherchant à gagner un peu d'argent, un professionnel partageant ses services, ou simplement quelqu'un qui veut contribuer à sa communauté - TAVNO est pour vous.</p>
+        </div>
+
+        <div class="about-section">
+          <h3>📋 Comment ça marche?</h3>
+          <ol class="about-list-ordered">
+            <li>Créez votre compte en quelques secondes</li>
+            <li>Parcourez et découvrez les quêtes disponibles</li>
+            <li>Publiez vos propres quêtes quand vous en avez besoin</li>
+            <li>Acceptez les quêtes qui vous intéressent</li>
+            <li>Gagnez des récompenses et construisez votre réputation</li>
+          </ol>
+        </div>
+
+        <div class="about-section">
+          <h3>💡 Pourquoi TAVNO?</h3>
+          <p><strong>TAVNO</strong> signifie "Quêtes" dans plusieurs langues. C'est une plateforme pensée pour être simple, intuitive et accessible à tous. Notre objectif est de rendre plus facile la connexion entre les personnes et de créer une économie de services collaborative et juste.</p>
+        </div>
+
+        <div class="about-footer">
+          <p>Rejoignez des milliers d'utilisateurs qui transforment déjà leur communauté avec TAVNO! 🚀</p>
+        </div>
+
+        <button class="back-button" onclick="navigate('home')">← Retour à l'accueil</button>
+      </div>
+    </section>
+
+    <template id="questCardTpl">
+      <article class="card">
+        <img class="card-img" loading="lazy">
+        <div class="card-body">
+          <h3 class="card-title"></h3>
+          <p class="card-desc"></p>
+          <div class="card-meta"></div>
+          <div class="card-actions">
+            <button class="view">Voir</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+      <section id=questDetail class=page>
+      <div class=panel>
+        <div class=quest-header>
+          <h1 id=q-title class=quest-title>Titre de la quête</h1>
+          <div id=q-meta class=quest-meta></div>
+        </div>
+
+        <img id=q-image src=/placeholder.jpg alt=Image de la quête class=quest-image>
+
+        <div class=info-grid>
+          <div class=info-card>
+            <span class=info-icon></span>
+            <div class=info-label>Localisation</div>
+            <div id=q-location class=info-value></div>
+          </div>
+
+          <div class=info-card>
+            <span class=info-icon></span>
+            <div class=info-label>Récompense</div>
+            <div id=q-reward class=info-value reward-highlight></div>
+          </div>
+
+          <div class=info-card>
+            <span class=info-icon></span>
+            <div class=info-label>Durée</div>
+            <div id=q-duration class=info-value></div>
+          </div>
+        </div>
+
+        <div class=section>
+          <h2 class=section-title> Description</h2>
+          <p id=q-description class=section-content></p>
+        </div>
+
+        <div class=section>
+          <h2 class=section-title> Conditions</h2>
+          <p id=q-conditions class=section-content></p>
+        </div>
+
+        <div class=button-row>
+          <button id=acceptBtn class=accept-button> Accepter</button>
+          <button id=callBtn class=call-button> Appeler</button>
+        </div>
+        <button id=backBtn class=back-button onclick="navigate('explore')"> Retour</button>
+      </div>
+    </section>
+
+      <section id=userProfile class=page>
+      <div class=panel>
+        <div class=profile-header>
+          <div class=profile-avatar id="profile-avatar-img"></div>
+          <div class=profile-info>
+            <div class=profile-title-row>
+              <h1 id=profile-name class=profile-name>Utilisateur</h1>
+              <button id=editProfileBtn class="edit-profile-btn">✏️ Modifier</button>
+            </div>
+            <div id=profile-bio class="profile-bio"></div>
+            <div class=profile-stats>
+              <div class=stat-item> <span id=profile-email></span></div>
+              <div class=stat-item> <span id=profile-phone></span></div>
+              <div class=stat-item> Membre</div>
+            </div>
+          </div>
+        </div>
+
+        <div class=stats-grid>
+          <div class=stat-card>
+            <span class=stat-icon></span>
+            <div class=stat-label>Solde</div>
+            <div id=profile-balance class=stat-value>0 FCFA</div>
+          </div>
+
+          <div class=stat-card>
+            <span class=stat-icon></span>
+            <div class=stat-label>Quêtes publiées</div>
+            <div id=profile-created class=stat-value>0</div>
+          </div>
+
+          <div class=stat-card>
+            <span class=stat-icon></span>
+            <div class=stat-label>Quêtes complétées</div>
+            <div id=profile-completed class=stat-value>0</div>
+          </div>
+
+          <div class=stat-card>
+            <span class=stat-icon></span>
+            <div class=stat-label>En cours</div>
+            <div id=profile-in-progress class=stat-value>0</div>
+          </div>
+        </div>
+
+        <div class=section>
+          <h2 class=section-title> Mes quêtes publiées</h2>
+          <div id=profile-quests class=profile-quests-list>
+            <p style="color: rgba(255,255,255,0.7);">Aucune quête publiée</p>
+          </div>
+        </div>
+
+        <div class=section>
+          <h2 class=section-title> Mes quêtes en cours</h2>
+          <div id="profile-inprogress" class="profile-quests-list">
+            <p style="color: rgba(255,255,255,0.7);">Aucune quête en cours</p>
+          </div>
+        </div>
+
+        <button id=profileBackBtn class=back-button onclick="navigate('home')"> Retour</button>
+      </div>
+    </section>
+
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Modifier mon profil</h2>
+        <form id="editProfileForm">
+          <div class="avatar-upload">
+            <div id="avatarPreview" class="avatar-preview"></div>
+            <label class="file-input-label">
+              Changer la photo de profil
+              <input type="file" id="avatarInput" name="avatar" accept="image/*" style="display:none;">
+            </label>
+          </div>
+          
+          <label>Nom
+            <input type="text" id="editName" name="name" required>
+          </label>
+          
+          <label>Téléphone
+            <input type="tel" id="editPhone" name="phone" placeholder="+22890000000">
+          </label>
+
+          <label>Bio
+            <textarea id="editBio" name="bio" placeholder="Parlez un peu de vous..." rows="3"></textarea>
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" class="primary">Enregistrer</button>
+            <button type="button" class="secondary" onclick="closeEditModal()">Annuler</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+
+

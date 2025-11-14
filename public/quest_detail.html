@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détail de la Quête</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Scoped styles from template, adapted to use existing style.css where possible */
+        body { display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+        .glass-container { max-width: 900px; width: 100%; }
+        .quest-title { font-size: 2.8rem; }
+        .quest-image { height: 300px; }
+        .accept-button { padding: 20px; }
+        .call-button { padding: 20px 30px; }
+        @media (max-width: 768px) {
+            .quest-title { font-size: 2.2rem; }
+            .quest-image { height: 200px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-container">
+        <div class="quest-header">
+            <h1 id="q-title" class="quest-title">Titre de la quête</h1>
+            <div id="q-meta" class="quest-meta">
+                <!-- badges go here -->
+            </div>
+        </div>
+
+        <img id="q-image" src="/placeholder.jpg" alt="Image de la quête" class="quest-image">
+
+        <div class="info-grid">
+            <div class="info-card">
+                <span class="info-icon">📍</span>
+                <div class="info-label">Localisation</div>
+                <div id="q-location" class="info-value">—</div>
+            </div>
+
+            <div class="info-card">
+                <span class="info-icon">💰</span>
+                <div class="info-label">Récompense</div>
+                <div id="q-reward" class="info-value reward-highlight">—</div>
+            </div>
+
+            <div class="info-card">
+                <span class="info-icon">⏱️</span>
+                <div class="info-label">Durée</div>
+                <div id="q-duration" class="info-value">—</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📝 Description</h2>
+            <p id="q-description" class="section-content">—</p>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">✅ Conditions requises</h2>
+            <p id="q-conditions" class="section-content">—</p>
+        </div>
+
+        <div class="button-row">
+            <button id="acceptBtn" class="accept-button">✓ Accepter cette quête</button>
+            <button id="callBtn" class="call-button">📞 Appeler</button>
+        </div>
+        <button id="backBtn" class="back-button">← Retour aux quêtes</button>
+    </div>
+
+    <script>
+        function qs(name){
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        async function loadQuest(){
+            const id = qs('id');
+            if(!id) return alert('Aucune quête spécifiée');
+            try{
+                const res = await fetch('/api/quests/' + id);
+                if(!res.ok) throw new Error('Not found');
+                const q = await res.json();
+                document.getElementById('q-title').textContent = q.title || 'Titre';
+                document.getElementById('q-image').src = q.image || '/placeholder.jpg';
+                const meta = document.getElementById('q-meta');
+                meta.innerHTML = '';
+                if(q.category) meta.appendChild(makeBadge(iconFor(q.category) + ' ' + capitalize(q.category)));
+                if(q.duration) meta.appendChild(makeBadge('⏱️ ' + q.duration));
+                if(q.creator) meta.appendChild(makeBadge('👤 ' + q.creator));
+
+                document.getElementById('q-location').textContent = q.location || '—';
+                document.getElementById('q-reward').textContent = (q.reward ? q.reward + ' FCFA' : '—');
+                document.getElementById('q-duration').textContent = q.duration || '—';
+                document.getElementById('q-description').innerHTML = q.description?.replace(/\n/g,'<br>') || '—';
+                document.getElementById('q-conditions').innerHTML = q.conditions?.replace(/\n/g,'<br>') || 'Aucune condition spécifiée.';
+
+                document.getElementById('acceptBtn').addEventListener('click', ()=>{
+                    if(confirm('Voulez-vous accepter cette quête ?')){
+                        alert('Vous avez accepté la quête. Le créateur sera notifié.');
+                    }
+                });
+
+                document.getElementById('callBtn').addEventListener('click', ()=>{
+                    if(q.creatorPhone) {
+                        window.location.href = 'tel:' + q.creatorPhone;
+                    } else {
+                        alert('Numéro non disponible');
+                    }
+                });
+
+            }catch(err){
+                alert('Impossible de charger la quête.');
+            }
+        }
+
+        function makeBadge(text){
+            const s = document.createElement('span');
+            s.className = 'meta-badge';
+            s.textContent = text;
+            return s;
+        }
+
+        function iconFor(cat){
+            switch((cat||'').toLowerCase()){
+                case 'transport': return '🚚';
+                case 'achats': return '🛒';
+                case 'aide': return '🤝';
+                case 'publicite': return '📣';
+                case 'enligne': return '💻';
+                default: return '📌';
+            }
+        }
+
+        function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+        document.getElementById('backBtn').addEventListener('click', ()=>{ window.location.href = '/'; });
+
+        loadQuest();
+    </script>
+</body>
+</html>
