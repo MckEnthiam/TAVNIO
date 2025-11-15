@@ -8,9 +8,6 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
-});
 // Storage for uploads
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
