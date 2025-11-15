@@ -297,6 +297,32 @@ app.post('/api/search/ai', async (req, res) => {
   }
 });
 
+// AI Chat endpoint
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `You are a helpful and friendly assistant for a quest-finding web app called TAVNO. Your name is TAVNO-AI.
+    Keep your answers concise and helpful. The user is asking for help within the app.
+    User's message: "${message}"
+    Your response:`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ reply: text });
+  } catch (err) {
+    console.error('AI chat error:', err);
+    res.status(500).json({ error: 'AI chat failed', details: err.message });
+  }
+});
+
 // Leave (abandon) a quest that the user previously accepted
 app.post('/api/quests/:id/leave', authenticateUser, async (req, res) => {
   const id = Number(req.params.id);

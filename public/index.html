@@ -370,6 +370,25 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <!-- AI Chat Widget -->
+  <div id="aiChatOpener" class="ai-chat-opener">
+    <button>🤖</button>
+  </div>
+
+  <div id="aiChatWidget" class="ai-chat-widget hidden">
+    <div class="ai-chat-header">
+      <span>TAVNO-AI Assistant</span>
+      <button id="closeAiChat" class="ai-chat-close-btn">&times;</button>
+    </div>
+    <div id="aiChatMessages" class="ai-chat-messages">
+      <!-- Messages will be added here by JavaScript -->
+    </div>
+    <form id="aiChatForm" class="ai-chat-form">
+      <input type="text" id="aiChatInput" placeholder="Posez votre question..." autocomplete="off" required>
+      <button type="submit">Envoyer</button>
+    </form>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>
