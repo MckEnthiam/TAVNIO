@@ -7,6 +7,8 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const bcrypt = require('bcrypt');
+const http = require('http');
+const { WebSocketServer } = require('ws');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +35,23 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
+
+// Create HTTP server and WebSocket server
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', ws => {
+  console.log('Client connected to WebSocket');
+  ws.on('close', () => console.log('Client disconnected'));
+});
+
+function broadcast(data) {
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) { // WebSocket.OPEN
+      client.send(JSON.stringify(data));
+    }
+  });
+}
 
 app.use(cors());
 app.use(express.json());
@@ -124,6 +143,7 @@ app.post('/api/quests', authenticateUser, upload.single('image'), async (req, re
   };
   db.data.quests.push(newQuest);
   await db.write();
+  broadcast({ type: 'QUEST_CREATED', payload: newQuest });
   res.json(newQuest);
 });
 
@@ -164,6 +184,7 @@ app.post('/api/quests/:id/accept', authenticateUser, async (req, res) => {
   }
 
   await db.write();
+  broadcast({ type: 'QUEST_UPDATED', payload: { id: quest.id } });
   res.json(quest);
 });
 
@@ -203,6 +224,7 @@ app.post('/api/quests/:id/complete', authenticateUser, async (req, res) => {
   }
 
   await db.write();
+  broadcast({ type: 'QUEST_UPDATED', payload: { id: quest.id } });
   res.json(quest);
 });
 
@@ -228,6 +250,7 @@ app.delete('/api/quests/:id', authenticateUser, async (req, res) => {
 
   db.data.quests.splice(idx, 1);
   await db.write();
+  broadcast({ type: 'QUEST_DELETED', payload: { id } });
   res.json({ success: true });
 });
 
@@ -272,6 +295,32 @@ app.post('/api/search/ai', async (req, res) => {
   }
 });
 
+// AI Chat endpoint
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `You are a helpful and friendly assistant for a quest-finding web app called TAVNO. Your name is TAVNO-AI.
+    Keep your answers concise and helpful. The user is asking for help within the app.
+    User's message: "${message}"
+    Your response:`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ reply: text });
+  } catch (err) {
+    console.error('AI chat error:', err);
+    res.status(500).json({ error: 'AI chat failed', details: err.message });
+  }
+});
+
 // Leave (abandon) a quest that the user previously accepted
 app.post('/api/quests/:id/leave', authenticateUser, async (req, res) => {
   const id = Number(req.params.id);
@@ -291,6 +340,7 @@ app.post('/api/quests/:id/leave', authenticateUser, async (req, res) => {
   if (quest.status === 'full' && quest.accepted.length < quest.slots) quest.status = 'open';
 
   await db.write();
+  broadcast({ type: 'QUEST_UPDATED', payload: { id: quest.id } });
   res.json(quest);
 });
 
@@ -397,8 +447,7 @@ app.post('/api/user/profile', authenticateUser, upload.single('avatar'), async (
 
 // start
 initDB().then(() => {
-  // Read the database once when the server starts
-  app.listen(PORT, () => console.log('Server running on', PORT));
+  server.listen(PORT, () => console.log('Server running on', PORT));
 }).catch(err => {
   console.error(err);
 });
