@@ -11,10 +11,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'YOUR_GEMINI_API_KEY_HERE';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
-});
-
 
 // Storage for uploads
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
