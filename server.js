@@ -6,11 +6,20 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'YOUR_GEMINI_API_KEY_HERE';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Fail fast if critical environment variables are missing
+if (!GEMINI_API_KEY) {
+  console.error('FATAL ERROR: GEMINI_API_KEY environment variable is not set.');
+  process.exit(1);
+}
+
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
 
 // Storage for uploads
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -30,32 +39,21 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
-// lowdb setup (FIXÉ VERSION 5+)
+// lowdb setup
 const adapter = new JSONFile(path.join(__dirname, 'db.json'));
+const db = new Low(adapter);
 
-const defaultData = {
-  quests: [],
-  users: []
-};
-
-const db = new Low(adapter, defaultData);
-
+// Initialize and seed the database.
+// NOTE: On hosting platforms with ephemeral filesystems (like Render's free tier),
+// this JSON file will be reset on every deploy or restart.
+// For production, a persistent database service (e.g., PostgreSQL, MongoDB) is recommended.
 async function initDB() {
   await db.read();
-  db.data ||= defaultData; // sécurité
+  db.data ||= { quests: [], users: [] };
 
-  // seed sample user if none
   if (!db.data.users.find(u => u.email === 'jean@example.com')) {
-    db.data.users.push({
-      id: 1,
-      name: 'Jean Dupont',
-      email: 'jean@example.com',
-      password: 'password',
-      balance: 25500,
-      bio: 'Bienvenue sur mon profil!',
-      avatar: '/avatars/default.png',
-      phone: '+22890000000'
-    });
+    const hashedPassword = await bcrypt.hash('password', 10);
+    db.data.users.push({ id: 1, name: 'Jean Dupont', email: 'jean@example.com', password: hashedPassword, balance: 25500, bio: 'Bienvenue sur mon profil!', avatar: '/avatars/default.png', phone: '+22890000000' });
   }
 
   if (db.data.quests.length === 0) {
@@ -67,26 +65,28 @@ async function initDB() {
 
   await db.write();
 }
-;
 
-  // seed sample user if none
-  if (!db.data.users.find(u => u.email === 'jean@example.com')) {
-    db.data.users.push({ id: 1, name: 'Jean Dupont', email: 'jean@example.com', password: 'password', balance: 25500, bio: 'Bienvenue sur mon profil!', avatar: '/avatars/default.png', phone: '+22890000000' });
+// Middleware to authenticate user and attach to request
+async function authenticateUser(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
-
-  if (db.data.quests.length === 0) {
-    db.data.quests.push(...[
-      { id: 1, title: 'Livraison de colis urgent', description: 'Livrer un colis depuis Lomé centre vers Agoè.', category: 'transport', reward: 5000, duration: '2h', location: 'Lomé → Agoè', creator: 'Jean Dupont', image: '/uploads/sample-1.jpg', status: 'open', createdAt: new Date().toISOString() },
-      { id: 2, title: 'Courses au supermarché', description: 'Faire les courses hebdomadaires.', category: 'achats', reward: 3000, duration: '1h', location: 'Lomé centre', creator: 'Alice M.', image: '/uploads/sample-2.jpg', status: 'open', createdAt: new Date().toISOString() }
-    ]);
+  const match = token.match(/token_(\d+)_/);
+  if (!match) {
+    return res.status(401).json({ error: 'Invalid token' });
   }
-
-  await db.write();
+  const userId = Number(match[1]);
+  const user = db.data.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+  req.user = user; // Attach user to the request object
+  next();
 }
 
 // Routes
 app.get('/api/quests', async (req, res) => {
-  await db.read();
   const { category, q } = req.query;
   let list = db.data.quests;
   if (category) list = list.filter(x => x.category === category);
@@ -95,14 +95,12 @@ app.get('/api/quests', async (req, res) => {
 });
 
 app.get('/api/quests/:id', async (req, res) => {
-  await db.read();
   const id = Number(req.params.id);
   const quest = db.data.quests.find(q => q.id === id);
   if (!quest) return res.status(404).json({ error: 'Not found' });
   res.json(quest);
 });
-app.post('/api/quests', upload.single('image'), async (req, res) => {
-  await db.read();
+app.post('/api/quests', authenticateUser, upload.single('image'), async (req, res) => {
   const body = req.body;
   const nextId = db.data.quests.reduce((m, x) => Math.max(m, x.id), 0) + 1;
   const slots = Number(body.slots) || 1;
@@ -114,8 +112,8 @@ app.post('/api/quests', upload.single('image'), async (req, res) => {
     reward: Number(body.reward) || 0,
     duration: body.duration || '',
     location: body.location || '',
-    creator: body.creator || 'Anonyme',
-    creatorId: body.creatorId ? Number(body.creatorId) : null,
+    creator: req.user.name,
+    creatorId: req.user.id,
     creatorPhone: body.creatorPhone || null,
     image: req.file ? '/uploads/' + req.file.filename : null,
     slots: slots,
@@ -129,19 +127,12 @@ app.post('/api/quests', upload.single('image'), async (req, res) => {
 });
 
 // Accept a quest
-app.post('/api/quests/:id/accept', async (req, res) => {
-  await db.read();
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const match = token.match(/token_(\d+)_/);
-  if (!match) return res.status(401).json({ error: 'Invalid token' });
-  const userId = Number(match[1]);
-  const user = db.data.users.find(u => u.id === userId);
-  if (!user) return res.status(401).json({ error: 'User not found' });
-
+app.post('/api/quests/:id/accept', authenticateUser, async (req, res) => {
   const id = Number(req.params.id);
   const quest = db.data.quests.find(q => q.id === id);
   if (!quest) return res.status(404).json({ error: 'Quest not found' });
+
+  const userId = req.user.id;
 
   quest.slots = Number(quest.slots) || 1;
   quest.accepted = quest.accepted || [];
@@ -160,13 +151,8 @@ app.post('/api/quests/:id/accept', async (req, res) => {
 });
 
 // Delete a quest (only creator)
-app.delete('/api/quests/:id', async (req, res) => {
-  await db.read();
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const match = token.match(/token_(\d+)_/);
-  if (!match) return res.status(401).json({ error: 'Invalid token' });
-  const userId = Number(match[1]);
+app.delete('/api/quests/:id', authenticateUser, async (req, res) => {
+  const userId = req.user.id;
   const id = Number(req.params.id);
   const idx = db.data.quests.findIndex(q => q.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Quest not found' });
@@ -192,13 +178,9 @@ app.delete('/api/quests/:id', async (req, res) => {
 // AI search endpoint for quest recommendations using Gemini
 app.post('/api/search/ai', async (req, res) => {
   try {
-    await db.read();
     const { query } = req.body;
     if (!query || query.trim().length === 0) {
       return res.status(400).json({ error: 'Query required' });
-    }
-    if (GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-      return res.status(400).json({ error: 'Gemini API key not configured. Set GEMINI_API_KEY environment variable.' });
     }
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -235,19 +217,12 @@ app.post('/api/search/ai', async (req, res) => {
 });
 
 // Leave (abandon) a quest that the user previously accepted
-app.post('/api/quests/:id/leave', async (req, res) => {
-  await db.read();
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const match = token.match(/token_(\d+)_/);
-  if (!match) return res.status(401).json({ error: 'Invalid token' });
-  const userId = Number(match[1]);
-  const user = db.data.users.find(u => u.id === userId);
-  if (!user) return res.status(401).json({ error: 'User not found' });
-
+app.post('/api/quests/:id/leave', authenticateUser, async (req, res) => {
   const id = Number(req.params.id);
   const quest = db.data.quests.find(q => q.id === id);
   if (!quest) return res.status(404).json({ error: 'Quest not found' });
+
+  const userId = req.user.id;
 
   quest.accepted = quest.accepted || [];
   const idx = quest.accepted.indexOf(userId);
@@ -265,10 +240,11 @@ app.post('/api/quests/:id/leave', async (req, res) => {
 
 // Auth endpoints
 app.post('/api/auth/login', async (req, res) => {
-  await db.read();
   const { email, password } = req.body;
-  const user = db.data.users.find(u => u.email === email && u.password === password);
+  const user = db.data.users.find(u => u.email === email);
   if (!user) return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   res.json({ 
     token: `token_${user.id}_${Date.now()}`, 
     id: user.id, 
@@ -282,7 +258,6 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/signup', async (req, res) => {
-  await db.read();
   const { email, password, confirmPassword, username, phone } = req.body;
   
   // Validation
@@ -292,11 +267,13 @@ app.post('/api/auth/signup', async (req, res) => {
   if (db.data.users.find(u => u.email === email)) return res.status(400).json({ error: 'Cet email est déjà utilisé' });
   if (db.data.users.find(u => u.name === username)) return res.status(400).json({ error: 'Ce nom d\'utilisateur est déjà pris' });
   
+  const hashedPassword = await bcrypt.hash(password, 10);
+
   const newUser = { 
     id: db.data.users.length + 1, 
     name: username, 
     email, 
-    password, 
+    password: hashedPassword,
     balance: 0, 
     bio: '', 
     avatar: '/avatars/default.png',
@@ -320,28 +297,16 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/auth/me', async (req, res) => {
-  await db.read();
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const match = token.match(/token_(\d+)_/);
-  if (!match) return res.status(401).json({ error: 'Invalid token' });
-  const userId = Number(match[1]);
-  const user = db.data.users.find(u => u.id === userId);
-  if (!user) return res.status(401).json({ error: 'User not found' });
+app.get('/api/auth/me', authenticateUser, (req, res) => {
+  const user = req.user;
   res.json({ id: user.id, name: user.name, email: user.email, balance: user.balance, bio: user.bio || '', avatar: user.avatar || '/avatars/default.png', phone: user.phone || '' });
 });
 
 // Profile update endpoint
-app.post('/api/user/profile', upload.single('avatar'), async (req, res) => {
-  await db.read();
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const match = token.match(/token_(\d+)_/);
-  if (!match) return res.status(401).json({ error: 'Invalid token' });
-  const userId = Number(match[1]);
-  const user = db.data.users.find(u => u.id === userId);
-  if (!user) return res.status(401).json({ error: 'User not found' });
+app.post('/api/user/profile', authenticateUser, upload.single('avatar'), async (req, res) => {
+  // Find the user in the database to modify the actual object
+  const user = db.data.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found in DB' });
 
   // Update fields
   if (req.body.name) user.name = req.body.name;
@@ -355,6 +320,7 @@ app.post('/api/user/profile', upload.single('avatar'), async (req, res) => {
 
 // start
 initDB().then(() => {
+  // Read the database once when the server starts
   app.listen(PORT, () => console.log('Server running on', PORT));
 }).catch(err => {
   console.error(err);
