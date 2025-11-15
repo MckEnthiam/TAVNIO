@@ -133,6 +133,10 @@ async function showQuestDetail(id){
     document.getElementById('q-title').textContent = q.title || 'Titre';
     document.getElementById('q-image').src = q.image || '/placeholder.jpg';
     const meta = document.getElementById('q-meta');
+    // Add questId to an element for later reference in WebSocket updates
+    document.getElementById('q-title').dataset.questId = id;
+
+
     meta.innerHTML = '';
     if(q.category) meta.appendChild(makeBadge(iconFor(q.category) + ' ' + capitalize(q.category)));
     if(q.duration) meta.appendChild(makeBadge('⏱️ ' + q.duration));
@@ -410,6 +414,7 @@ async function showUserProfile() {
   document.getElementById('profile-email').textContent = currentUser.email;
     document.getElementById('profile-phone').textContent = currentUser.phone || '';
   document.getElementById('profile-balance').textContent = currentUser.balance + ' FCFA';
+  document.getElementById('profile-rating').innerHTML = ''; // Clear previous rating
   document.getElementById('profile-created').textContent = '—';
   document.getElementById('profile-completed').textContent = '—';
   document.getElementById('profile-in-progress').textContent = '—';
@@ -434,10 +439,11 @@ async function showUserProfile() {
   
   // Fetch and show user's quests
   try {
-    const res = await fetch('/api/quests');
-    const allQuests = await res.json();
-    const userQuests = allQuests.filter(q => q.creator === currentUser.name);
+    const [questsRes, userProfileRes] = await Promise.all([fetch('/api/quests'), fetch(`/api/users/${currentUser.id}`)]);
+    const allQuests = await questsRes.json();
+    const userProfileData = await userProfileRes.json();
     const questsList = document.getElementById('profile-quests');
+    const userQuests = allQuests.filter(q => q.creatorId === currentUser.id);
     if (userQuests.length === 0) {
       questsList.innerHTML = '<p style="color: rgba(255,255,255,0.7);">Aucune quête publiée</p>';
     } else {
@@ -449,13 +455,14 @@ async function showUserProfile() {
           </div>
           <div style="display:flex;gap:10px;align-items:center;">
             <button class="secondary" onclick="showQuestDetail(${q.id})">Voir</button>
-            <button class="secondary" onclick="deleteQuest(${q.id})">Supprimer</button>
+            ${q.status !== 'completed' ? `<button class="secondary" onclick="deleteQuest(${q.id})">Supprimer</button>` : ''}
+            ${q.status === 'completed' && !q.reviews?.creator_reviewed ? `<button class="primary" onclick="openReviewModal(${q.id}, ${q.completedBy})">Évaluer</button>` : ''}
             <span style="color: ${q.status === 'open' ? '#10b981' : '#f59e0b'};">${q.status === 'open' ? '🟢 Ouverte' : '⏳ En cours'}</span>
           </div>
         </div>
       `).join('');
     }
-    // Quests the user has accepted (in progress)
+    // Quests the user has accepted
     const inProgressListEl = document.getElementById('profile-inprogress');
     const inProgress = allQuests.filter(q => (q.accepted || []).includes(currentUser.id));
     document.getElementById('profile-in-progress').textContent = inProgress.length;
@@ -470,17 +477,50 @@ async function showUserProfile() {
           </div>
           <div style="display:flex;gap:10px;align-items:center;">
             <button class="secondary" onclick="showQuestDetail(${q.id})">Voir</button>
-            <button class="danger" onclick="leaveQuest(${q.id})">Abandonner</button>
+            ${q.status !== 'completed' ? `<button class="danger" onclick="leaveQuest(${q.id})">Abandonner</button>` : ''}
+            ${q.status === 'completed' && !q.reviews?.completer_reviewed ? `<button class="primary" onclick="openReviewModal(${q.id}, ${q.creatorId})">Évaluer</button>` : ''}
             <span style="color:#f59e0b;font-weight:700;">En cours</span>
           </div>
         </div>
       `).join('');
     }
+
+    // Render reviews and rating
+    document.getElementById('profile-rating').innerHTML = `
+      <div class="star-rating">${renderStars(userProfileData.avgRating)}</div>
+      <strong>${userProfileData.avgRating}</strong>
+      <span>(${userProfileData.reviewCount} avis)</span>
+    `;
+    const reviewsList = document.getElementById('profile-reviews-list');
+    if (userProfileData.reviews && userProfileData.reviews.length > 0) {
+      reviewsList.innerHTML = userProfileData.reviews.map(r => `
+        <div class="review-item">
+          <div class="review-header">
+            <span class="review-author">${r.fromUserName}</span>
+            <div class="star-rating">${renderStars(r.rating)}</div>
+          </div>
+          <p class="review-comment">"${r.comment || 'Aucun commentaire.'}"</p>
+          <small style="color: rgba(255,255,255,0.5);">Pour la quête : ${r.questTitle}</small>
+        </div>
+      `).join('');
+    } else {
+      reviewsList.innerHTML = '<p style="color: rgba(255,255,255,0.7);">Aucun avis pour le moment.</p>';
+    }
+
   } catch (err) {
     console.error('Error loading user quests:', err);
   }
   
   navigate('userProfile');
+}
+
+function renderStars(rating, max = 5) {
+  let stars = '';
+  const fullStars = Math.round(rating);
+  for (let i = 1; i <= max; i++) {
+    stars += i <= fullStars ? '★' : '<span class="empty">☆</span>';
+  }
+  return stars;
 }
 
 // publish
@@ -628,6 +668,68 @@ document.getElementById('aiSearchBtn')?.addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = '✨ IA';
+  }
+});
+
+// Review Modal Logic
+let currentRating = 0;
+function openReviewModal(questId, targetUserId) {
+  const modal = document.getElementById('reviewModal');
+  const form = document.getElementById('reviewForm');
+  form.reset();
+  form.querySelector('[name="questId"]').value = questId;
+  form.querySelector('[name="targetUserId"]').value = targetUserId;
+  
+  // You might want to fetch quest title here if not available
+  document.getElementById('reviewQuestTitle').textContent = `ID: ${questId}`;
+
+  // Reset stars
+  currentRating = 0;
+  const stars = modal.querySelectorAll('.star-rating-input span');
+  stars.forEach(star => star.classList.remove('selected'));
+
+  modal.classList.remove('hidden');
+}
+
+function closeReviewModal() {
+  document.getElementById('reviewModal').classList.add('hidden');
+}
+
+document.querySelectorAll('.star-rating-input span').forEach(star => {
+  star.addEventListener('click', () => {
+    currentRating = parseInt(star.dataset.value, 10);
+    document.querySelectorAll('.star-rating-input span').forEach(s => {
+      s.classList.toggle('selected', parseInt(s.dataset.value, 10) <= currentRating);
+    });
+  });
+});
+
+document.getElementById('reviewForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (currentRating === 0) {
+    toast('Veuillez sélectionner une note (1 à 5 étoiles).');
+    return;
+  }
+  const form = e.target;
+  const body = {
+    questId: parseInt(form.querySelector('[name="questId"]').value, 10),
+    targetUserId: parseInt(form.querySelector('[name="targetUserId"]').value, 10),
+    rating: currentRating,
+    comment: form.querySelector('[name="comment"]').value
+  };
+
+  try {
+    const res = await fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Failed to submit review');
+    toast('Avis envoyé avec succès !');
+    closeReviewModal();
+    showUserProfile(); // Refresh profile to show new state
+  } catch (err) {
+    toast(`Erreur : ${err.message}`);
   }
 });
 

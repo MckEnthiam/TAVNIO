@@ -245,6 +245,7 @@
         <div class=profile-header>
           <div class=profile-avatar id="profile-avatar-img"></div>
           <div class=profile-info>
+            <div id="profile-rating" class="profile-rating"></div>
             <div class=profile-title-row>
               <h1 id=profile-name class=profile-name>Utilisateur</h1>
               <button id=editProfileBtn class="edit-profile-btn">✏️ Modifier</button>
@@ -298,6 +299,12 @@
           </div>
         </div>
 
+        <div class="section">
+          <h2 class="section-title">Avis et Évaluations</h2>
+          <div id="profile-reviews-list" class="reviews-list">
+            <p style="color: rgba(255,255,255,0.7);">Aucun avis pour le moment.</p>
+          </div>
+        </div>
         <button id=profileBackBtn class=back-button onclick="navigate('home')"> Retour</button>
       </div>
     </section>
@@ -330,6 +337,30 @@
           <div class="form-actions">
             <button type="submit" class="primary">Enregistrer</button>
             <button type="button" class="secondary" onclick="closeEditModal()">Annuler</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Laisser un avis</h2>
+        <form id="reviewForm">
+          <input type="hidden" name="questId">
+          <input type="hidden" name="targetUserId">
+          <p>Évaluez votre expérience pour la quête : <strong id="reviewQuestTitle"></strong></p>
+          <div class="star-rating-input">
+            <span data-value="1">☆</span>
+            <span data-value="2">☆</span>
+            <span data-value="3">☆</span>
+            <span data-value="4">☆</span>
+            <span data-value="5">☆</span>
+          </div>
+          <textarea name="comment" placeholder="Laissez un commentaire (optionnel)..." rows="4"></textarea>
+          <div class="form-actions">
+            <button type="submit" class="primary">Envoyer</button>
+            <button type="button" class="secondary" onclick="closeReviewModal()">Annuler</button>
           </div>
         </form>
       </div>

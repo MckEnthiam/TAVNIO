@@ -67,7 +67,7 @@ const db = new Low(adapter);
 // this JSON file will be reset on every deploy or restart.
 // For production, a persistent database service (e.g., PostgreSQL, MongoDB) is recommended.
 async function initDB() {
-  await db.read();
+  await db.read(); // Ensure db is read before any operations
   db.data ||= { quests: [], users: [] };
 
   if (!db.data.users.find(u => u.email === 'jean@example.com')) {
@@ -77,8 +77,8 @@ async function initDB() {
 
   if (db.data.quests.length === 0) {
     db.data.quests.push(...[
-      { id: 1, title: 'Livraison de colis urgent', description: 'Livrer un colis depuis Lomé centre vers Agoè.', category: 'transport', reward: 5000, duration: '2h', location: 'Lomé → Agoè', creator: 'Jean Dupont', creatorId: 1, image: '/uploads/sample-1.jpg', status: 'open', createdAt: new Date().toISOString(), accepted: [] },
-      { id: 2, title: 'Courses au supermarché', description: 'Faire les courses hebdomadaires.', category: 'achats', reward: 3000, duration: '1h', location: 'Lomé centre', creator: 'Alice M.', creatorId: 1, image: '/uploads/sample-2.jpg', status: 'open', createdAt: new Date().toISOString(), accepted: [] }
+      { id: 1, title: 'Livraison de colis urgent', description: 'Livrer un colis depuis Lomé centre vers Agoè.', category: 'transport', reward: 5000, duration: '2h', location: 'Lomé → Agoè', creator: 'Jean Dupont', creatorId: 1, image: '/uploads/sample-1.jpg', status: 'open', createdAt: new Date().toISOString(), accepted: [], slots: 1, reviews: {} },
+      { id: 2, title: 'Courses au supermarché', description: 'Faire les courses hebdomadaires.', category: 'achats', reward: 3000, duration: '1h', location: 'Lomé centre', creator: 'Alice M.', creatorId: 1, image: '/uploads/sample-2.jpg', status: 'open', createdAt: new Date().toISOString(), accepted: [], slots: 1, reviews: {} }
     ]);
   }
 
@@ -139,7 +139,8 @@ app.post('/api/quests', authenticateUser, upload.single('image'), async (req, re
     accepted: [],
     status: 'open',
     createdAt: new Date().toISOString(),
-    completionKey: null // New field for completion key
+    completionKey: null,
+    reviews: {} // To track review status
   };
   db.data.quests.push(newQuest);
   await db.write();
@@ -202,6 +203,7 @@ app.post('/api/quests/:id/complete', authenticateUser, async (req, res) => {
   if (quest.completionKey !== key) return res.status(400).json({ error: 'Invalid completion key' });
 
   quest.status = 'completed';
+  quest.completedBy = userId; // Store who completed it
   // Remove from accepted list
   quest.accepted = quest.accepted.filter(id => id !== userId);
 
@@ -443,6 +445,64 @@ app.post('/api/user/profile', authenticateUser, upload.single('avatar'), async (
 
   await db.write();
   res.json({ id: user.id, name: user.name, email: user.email, balance: user.balance, bio: user.bio || '', avatar: user.avatar, phone: user.phone || '' });
+});
+
+// Get user public profile (including reviews)
+app.get('/api/users/:id', async (req, res) => {
+  const userId = Number(req.params.id);
+  const user = db.data.users.find(u => u.id === userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Calculate average rating
+  const reviews = user.reviews || [];
+  const avgRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+
+  res.json({
+    id: user.id,
+    name: user.name,
+    avatar: user.avatar,
+    bio: user.bio,
+    reviews: reviews,
+    avgRating: avgRating.toFixed(1),
+    reviewCount: reviews.length
+  });
+});
+
+// Submit a review
+app.post('/api/reviews', authenticateUser, async (req, res) => {
+  const { questId, targetUserId, rating, comment } = req.body;
+  const reviewerId = req.user.id;
+
+  const quest = db.data.quests.find(q => q.id === questId);
+  if (!quest) return res.status(404).json({ error: 'Quest not found' });
+  if (quest.status !== 'completed') return res.status(400).json({ error: 'Quest not yet completed' });
+
+  const targetUser = db.data.users.find(u => u.id === targetUserId);
+  if (!targetUser) return res.status(404).json({ error: 'User to review not found' });
+
+  // Determine reviewer's role
+  const isCreator = quest.creatorId === reviewerId;
+  const isCompleter = quest.completedBy === reviewerId;
+
+  if (!isCreator && !isCompleter) return res.status(403).json({ error: 'Not authorized to review this quest' });
+
+  // Prevent double reviews
+  const reviewKey = isCreator ? 'creator_reviewed' : 'completer_reviewed';
+  if (quest.reviews[reviewKey]) return res.status(400).json({ error: 'Already reviewed' });
+
+  targetUser.reviews = targetUser.reviews || [];
+  targetUser.reviews.unshift({
+    fromUserId: reviewerId,
+    fromUserName: req.user.name,
+    questId: quest.id,
+    questTitle: quest.title,
+    rating: Number(rating),
+    comment: comment,
+    timestamp: new Date().toISOString()
+  });
+  quest.reviews[reviewKey] = true;
+  await db.write();
+  res.status(201).json({ success: true });
 });
 
 // start
