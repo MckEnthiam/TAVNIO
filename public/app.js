@@ -733,6 +733,9 @@ document.getElementById('reviewForm')?.addEventListener('submit', async (e) => {
   }
 });
 
+  }
+});
+
 function setupWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${protocol}//${window.location.host}`);
@@ -777,12 +780,77 @@ function setupWebSocket() {
   };
 }
 
+// AI Chat Widget Logic
+function setupAiChat() {
+  const opener = document.getElementById('aiChatOpener');
+  const widget = document.getElementById('aiChatWidget');
+  const closeBtn = document.getElementById('closeAiChat');
+  const form = document.getElementById('aiChatForm');
+  const input = document.getElementById('aiChatInput');
+  const messagesContainer = document.getElementById('aiChatMessages');
+
+  if (!opener || !widget || !closeBtn || !form) {
+    console.error('One or more AI chat elements are missing from the DOM.');
+    return;
+  }
+
+  function addMessage(text, sender, isLoading = false) {
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('ai-chat-message', sender);
+    if (isLoading) {
+      msgDiv.classList.add('loading');
+      msgDiv.innerHTML = '<span></span><span></span><span></span>';
+    } else {
+      msgDiv.textContent = text;
+    }
+    messagesContainer.appendChild(msgDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    return msgDiv;
+  }
+
+  opener.addEventListener('click', () => {
+    widget.classList.remove('hidden');
+    opener.classList.add('hidden');
+    if (messagesContainer.children.length === 0) {
+      addMessage("Bonjour ! Je suis l'assistant TAVNO-AI. Comment puis-je vous aider ?", 'ai');
+    }
+    input.focus();
+  });
+
+  closeBtn.addEventListener('click', () => {
+    widget.classList.add('hidden');
+    opener.classList.remove('hidden');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const userMessage = input.value.trim();
+    if (!userMessage) return;
+
+    addMessage(userMessage, 'user');
+    input.value = '';
+    const loadingIndicator = addMessage('', 'ai', true);
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage })
+      });
+      const data = await res.json();
+      loadingIndicator.remove();
+      addMessage(data.reply, 'ai');
+    } catch (err) {
+      loadingIndicator.remove();
+      addMessage("Désolé, une erreur s'est produite. Veuillez réessayer.", 'ai');
+      console.error('AI Chat Error:', err);
+    }
+  });
+}
+
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click', ()=>navigate(b.dataset.target)));
 
 // init
-checkAuth();
-navigate('home');
-fetchQuests();
 
 setupWebSocket(); // Initialize WebSocket connection
 // Set background video playback speed
