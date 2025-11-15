@@ -273,11 +273,27 @@ app.post('/api/search/ai', async (req, res) => {
       reward: q.reward,
       location: q.location
     }));
-    const prompt = `You are a quest recommendation engine. A user is searching for quests with the following query: "${query}"\n\nHere is the list of available quests:\n${JSON.stringify(questsList, null, 2)}\n\nBased on the user's query, recommend the most relevant quests by their IDs. Also suggest what the user might be looking for if their query is vague.\nRespond in JSON format: {"recommendedIds": [1,2,3], "suggestion": "Your helpful suggestion", "reasoning": "Why these quests match"}\nRespond ONLY with valid JSON, no markdown or extra text.`;
+    const prompt = `You are a quest recommendation engine for a platform called TAVNO. A user is searching for quests with the query: "${query}".
+
+Here is a list of available quests:
+${JSON.stringify(questsList, null, 2)}
+
+Analyze the user's query and recommend the most relevant quest IDs.
+If the query is vague, provide a helpful suggestion for a better search.
+
+Your response MUST be a valid JSON object with the following structure:
+{
+  "recommendedIds": [/* array of integer IDs */],
+  "suggestion": "/* a helpful suggestion string */",
+  "reasoning": "/* a brief explanation for your choices */"
+}
+Do NOT include markdown formatting like \`\`\`json in your response.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
+    let text = response.text();
+    // Clean the response to ensure it's valid JSON
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -285,7 +301,7 @@ app.post('/api/search/ai', async (req, res) => {
       return res.status(500).json({ error: 'Failed to parse AI response', details: text });
     }
 
-    const recommendedQuests = db.data.quests.filter(q => parsed.recommendedIds.includes(q.id));
+    const recommendedQuests = db.data.quests.filter(q => Array.isArray(parsed.recommendedIds) && parsed.recommendedIds.includes(q.id));
     res.json({
       quests: recommendedQuests,
       suggestion: parsed.suggestion || '',
@@ -307,10 +323,16 @@ app.post('/api/ai/chat', async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const prompt = `You are a helpful and friendly assistant for a quest-finding web app called TAVNO. Your name is TAVNO-AI.
-    Keep your answers concise and helpful. The user is asking for help within the app.
-    User's message: "${message}"
-    Your response:`;
+    const prompt = `You are TAVNO-AI, a friendly and helpful assistant for a quest-finding web app called TAVNO.
+
+Your primary role is to help users navigate the app, find quests, or understand how the platform works.
+The main categories for quests are: Transport, Achats (Shopping), Aide (Help), Publicité (Advertising), and En ligne (Online).
+
+Keep your answers concise, helpful, and directly related to the TAVNO app.
+Do not go off-topic.
+
+User's message: "${message}"
+Your response:`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
