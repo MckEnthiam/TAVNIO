@@ -10,7 +10,7 @@ const bcrypt = require('bcrypt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = "AIzaSyC3ib6Kg1RnqjT5R8Sx7ax8Ew1v8nxsyr0";
 
 // Fail fast if critical environment variables are missing
 if (!GEMINI_API_KEY) {

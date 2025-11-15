@@ -100,7 +100,8 @@ function renderQuests(list){
     node.querySelector('.card-desc').textContent = item.description;
     const acceptedCount = (item.accepted || []).length;
     const slots = Number(item.slots) || 1;
-    node.querySelector('.card-meta').textContent = `${item.location || '—'} • ${item.duration || '—'} • ${item.reward} FCFA • ${acceptedCount}/${slots} places`;
+    const createdAt = new Date(item.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    node.querySelector('.card-meta').textContent = `${item.location || '—'} • ${item.duration || '—'} • ${item.reward} FCFA • ${acceptedCount}/${slots} places • Publié le ${createdAt}`;
     const actions = node.querySelector('.card-actions');
     actions.innerHTML = '';
     if (acceptedCount >= slots) {
