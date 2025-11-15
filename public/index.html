@@ -69,7 +69,10 @@
     <section id="explore" class="page">
       <div class="panel explore">
         <div class="explore-header">
-          <input id="searchInput" placeholder="Chercher une quête...">
+          <div class="search-wrapper">
+            <input id="searchInput" placeholder="Chercher une quête...">
+            <button id="aiSearchBtn" class="ai-search-btn" title="Recherche IA Gemini">✨ IA</button>
+          </div>
           <select id="categorySelect">
             <option value="">Toutes catégories</option>
             <option value="transport">Transport</option>
@@ -79,6 +82,7 @@
             <option value="enligne">En ligne</option>
           </select>
         </div>
+        <div id="aiSuggestion" class="ai-suggestion hidden"></div>
         <div id="questsGrid" class="grid"></div>
       </div>
     </section>

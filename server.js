@@ -5,9 +5,17 @@ const { JSONFile } = require('lowdb/node');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'YOUR_GEMINI_API_KEY_HERE';
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+app.listen(PORT, () => {
+    console.log("Server running on port " + PORT);
+});
+
+
 // Storage for uploads
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
@@ -152,6 +160,51 @@ app.delete('/api/quests/:id', async (req, res) => {
   db.data.quests.splice(idx, 1);
   await db.write();
   res.json({ success: true });
+});
+
+// AI search endpoint for quest recommendations using Gemini
+app.post('/api/search/ai', async (req, res) => {
+  try {
+    await db.read();
+    const { query } = req.body;
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Query required' });
+    }
+    if (GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+      return res.status(400).json({ error: 'Gemini API key not configured. Set GEMINI_API_KEY environment variable.' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const questsList = db.data.quests.map(q => ({
+      id: q.id,
+      title: q.title,
+      description: q.description,
+      category: q.category,
+      reward: q.reward,
+      location: q.location
+    }));
+    const prompt = `You are a quest recommendation engine. A user is searching for quests with the following query: "${query}"\n\nHere is the list of available quests:\n${JSON.stringify(questsList, null, 2)}\n\nBased on the user's query, recommend the most relevant quests by their IDs. Also suggest what the user might be looking for if their query is vague.\nRespond in JSON format: {"recommendedIds": [1,2,3], "suggestion": "Your helpful suggestion", "reasoning": "Why these quests match"}\nRespond ONLY with valid JSON, no markdown or extra text.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to parse AI response', details: text });
+    }
+
+    const recommendedQuests = db.data.quests.filter(q => parsed.recommendedIds.includes(q.id));
+    res.json({
+      quests: recommendedQuests,
+      suggestion: parsed.suggestion || '',
+      reasoning: parsed.reasoning || ''
+    });
+  } catch (err) {
+    console.error('AI search error:', err);
+    res.status(500).json({ error: 'AI search failed', details: err.message });
+  }
 });
 
 // Leave (abandon) a quest that the user previously accepted

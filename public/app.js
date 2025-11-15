@@ -471,6 +471,48 @@ document.getElementById('editProfileBtn')?.addEventListener('click', openEditMod
 document.getElementById('searchInput')?.addEventListener('input', () => fetchQuests());
 document.getElementById('categorySelect')?.addEventListener('change', () => fetchQuests());
 
+// AI Search functionality with Gemini
+document.getElementById('aiSearchBtn')?.addEventListener('click', async () => {
+  const query = document.getElementById('searchInput')?.value || '';
+  if (!query.trim()) {
+    toast('Entrez un terme de recherche pour utiliser l\'IA');
+    return;
+  }
+  
+  const btn = document.getElementById('aiSearchBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Recherche...';
+  
+  try {
+    const res = await fetch('/api/search/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      renderQuests(data.quests);
+      
+      const suggestionEl = document.getElementById('aiSuggestion');
+      if (data.suggestion) {
+        suggestionEl.innerHTML = `<strong>💡 Suggestion IA:</strong> ${data.suggestion}`;
+        suggestionEl.classList.remove('hidden');
+      }
+      toast('Résultats IA chargés');
+    } else {
+      const err = await res.json();
+      toast(err.error || 'Erreur lors de la recherche IA');
+    }
+  } catch (err) {
+    console.error(err);
+    toast('Erreur réseau lors de la recherche IA');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ IA';
+  }
+});
+
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click', ()=>navigate(b.dataset.target)));
 
 // init
