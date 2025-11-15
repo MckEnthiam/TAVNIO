@@ -30,13 +30,44 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
-// lowdb setup
+// lowdb setup (FIXÉ VERSION 5+)
 const adapter = new JSONFile(path.join(__dirname, 'db.json'));
-const db = new Low(adapter);
+
+const defaultData = {
+  quests: [],
+  users: []
+};
+
+const db = new Low(adapter, defaultData);
 
 async function initDB() {
   await db.read();
-  db.data ||= { quests: [], users: [] };
+  db.data ||= defaultData; // sécurité
+
+  // seed sample user if none
+  if (!db.data.users.find(u => u.email === 'jean@example.com')) {
+    db.data.users.push({
+      id: 1,
+      name: 'Jean Dupont',
+      email: 'jean@example.com',
+      password: 'password',
+      balance: 25500,
+      bio: 'Bienvenue sur mon profil!',
+      avatar: '/avatars/default.png',
+      phone: '+22890000000'
+    });
+  }
+
+  if (db.data.quests.length === 0) {
+    db.data.quests.push(...[
+      { id: 1, title: 'Livraison de colis urgent', description: 'Livrer un colis depuis Lomé centre vers Agoè.', category: 'transport', reward: 5000, duration: '2h', location: 'Lomé → Agoè', creator: 'Jean Dupont', image: '/uploads/sample-1.jpg', status: 'open', createdAt: new Date().toISOString() },
+      { id: 2, title: 'Courses au supermarché', description: 'Faire les courses hebdomadaires.', category: 'achats', reward: 3000, duration: '1h', location: 'Lomé centre', creator: 'Alice M.', image: '/uploads/sample-2.jpg', status: 'open', createdAt: new Date().toISOString() }
+    ]);
+  }
+
+  await db.write();
+}
+;
 
   // seed sample user if none
   if (!db.data.users.find(u => u.email === 'jean@example.com')) {
