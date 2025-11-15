@@ -53,13 +53,13 @@ async function initDB() {
 
   if (!db.data.users.find(u => u.email === 'jean@example.com')) {
     const hashedPassword = await bcrypt.hash('password', 10);
-    db.data.users.push({ id: 1, name: 'Jean Dupont', email: 'jean@example.com', password: hashedPassword, balance: 25500, bio: 'Bienvenue sur mon profil!', avatar: '/avatars/default.png', phone: '+22890000000' });
+    db.data.users.push({ id: 1, name: 'Jean Dupont', email: 'jean@example.com', password: hashedPassword, balance: 25500, bio: 'Bienvenue sur mon profil!', avatar: '/avatars/default.png', phone: '+22890000000', notifications: [] });
   }
 
   if (db.data.quests.length === 0) {
     db.data.quests.push(...[
-      { id: 1, title: 'Livraison de colis urgent', description: 'Livrer un colis depuis Lomé centre vers Agoè.', category: 'transport', reward: 5000, duration: '2h', location: 'Lomé → Agoè', creator: 'Jean Dupont', image: '/uploads/sample-1.jpg', status: 'open', createdAt: new Date().toISOString() },
-      { id: 2, title: 'Courses au supermarché', description: 'Faire les courses hebdomadaires.', category: 'achats', reward: 3000, duration: '1h', location: 'Lomé centre', creator: 'Alice M.', image: '/uploads/sample-2.jpg', status: 'open', createdAt: new Date().toISOString() }
+      { id: 1, title: 'Livraison de colis urgent', description: 'Livrer un colis depuis Lomé centre vers Agoè.', category: 'transport', reward: 5000, duration: '2h', location: 'Lomé → Agoè', creator: 'Jean Dupont', creatorId: 1, image: '/uploads/sample-1.jpg', status: 'open', createdAt: new Date().toISOString(), accepted: [] },
+      { id: 2, title: 'Courses au supermarché', description: 'Faire les courses hebdomadaires.', category: 'achats', reward: 3000, duration: '1h', location: 'Lomé centre', creator: 'Alice M.', creatorId: 1, image: '/uploads/sample-2.jpg', status: 'open', createdAt: new Date().toISOString(), accepted: [] }
     ]);
   }
 
@@ -119,7 +119,8 @@ app.post('/api/quests', authenticateUser, upload.single('image'), async (req, re
     slots: slots,
     accepted: [],
     status: 'open',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    completionKey: null // New field for completion key
   };
   db.data.quests.push(newQuest);
   await db.write();
@@ -145,6 +146,61 @@ app.post('/api/quests/:id/accept', authenticateUser, async (req, res) => {
   quest.accepted.push(userId);
   // optionally change status when full
   if (quest.accepted.length >= quest.slots) quest.status = 'full';
+
+  // Generate a unique completion key
+  const completionKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+  quest.completionKey = completionKey;
+
+  // Notify the quest creator
+  const creator = db.data.users.find(u => u.id === quest.creatorId);
+  if (creator) {
+    creator.notifications = creator.notifications || [];
+    creator.notifications.push({
+      id: Date.now(),
+      message: `Clé d'acceptation pour la quête "${quest.title}": ${completionKey}`,
+      read: false,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  await db.write();
+  res.json(quest);
+});
+
+// Complete a quest
+app.post('/api/quests/:id/complete', authenticateUser, async (req, res) => {
+  const id = Number(req.params.id);
+  const quest = db.data.quests.find(q => q.id === id);
+  if (!quest) return res.status(404).json({ error: 'Quest not found' });
+
+  const userId = req.user.id;
+  const { key } = req.body;
+
+  if (!quest.accepted.includes(userId)) return res.status(403).json({ error: 'You have not accepted this quest' });
+  if (quest.status === 'completed') return res.status(400).json({ error: 'Quest already completed' });
+  if (quest.completionKey !== key) return res.status(400).json({ error: 'Invalid completion key' });
+
+  quest.status = 'completed';
+  // Remove from accepted list
+  quest.accepted = quest.accepted.filter(id => id !== userId);
+
+  // Reward the user who completed the quest
+  const completer = db.data.users.find(u => u.id === userId);
+  if (completer) {
+    completer.balance = (completer.balance || 0) + quest.reward;
+  }
+
+  // Notify the quest creator that the quest has been completed
+  const creator = db.data.users.find(u => u.id === quest.creatorId);
+  if (creator) {
+    creator.notifications = creator.notifications || [];
+    creator.notifications.push({
+      id: Date.now(),
+      message: `La quête "${quest.title}" a été complétée par ${req.user.name}.`,
+      read: false,
+      timestamp: new Date().toISOString()
+    });
+  }
 
   await db.write();
   res.json(quest);
@@ -277,7 +333,8 @@ app.post('/api/auth/signup', async (req, res) => {
     balance: 0, 
     bio: '', 
     avatar: '/avatars/default.png',
-    phone: phone || ''
+    phone: phone || '',
+    notifications: [] // Initialize notifications for new users
   };
   db.data.users.push(newUser);
   await db.write();
@@ -299,7 +356,27 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/auth/me', authenticateUser, (req, res) => {
   const user = req.user;
-  res.json({ id: user.id, name: user.name, email: user.email, balance: user.balance, bio: user.bio || '', avatar: user.avatar || '/avatars/default.png', phone: user.phone || '' });
+  res.json({ id: user.id, name: user.name, email: user.email, balance: user.balance, bio: user.bio || '', avatar: user.avatar || '/avatars/default.png', phone: user.phone || '', notifications: user.notifications || [] });
+});
+
+// Get user notifications
+app.get('/api/user/notifications', authenticateUser, (req, res) => {
+  res.json(req.user.notifications || []);
+});
+
+// Mark notification as read
+app.post('/api/user/notifications/:id/read', authenticateUser, async (req, res) => {
+  const notificationId = Number(req.params.id);
+  const user = db.data.users.find(u => u.id === req.user.id);
+  if (user && user.notifications) {
+    const notification = user.notifications.find(n => n.id === notificationId);
+    if (notification) {
+      notification.read = true;
+      await db.write();
+      return res.json({ success: true });
+    }
+  }
+  res.status(404).json({ error: 'Notification not found' });
 });
 
 // Profile update endpoint

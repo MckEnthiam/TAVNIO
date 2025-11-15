@@ -14,6 +14,7 @@ function clearUser() {
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
   updateAuthUI();
+  fetchNotifications(); // Fetch notifications on auth state change
 }
 
 function getToken() {
@@ -24,6 +25,7 @@ function updateAuthUI() {
   const loginBtn = document.getElementById('loginBtn');
   const signupBtn = document.getElementById('signupBtn');
   const userMenu = document.getElementById('userMenu');
+  const notificationBell = document.getElementById('notificationBell');
   
   if (currentUser) {
     const avatar = currentUser.avatar && !currentUser.avatar.includes('default') 
@@ -40,12 +42,14 @@ function updateAuthUI() {
       navigate('home');
       toast('Déconnecté');
     };
+    notificationBell.classList.remove('hidden');
   } else {
     loginBtn.textContent = 'Se connecter';
     loginBtn.style.display = 'block';
     signupBtn.textContent = "S'inscrire";
     loginBtn.onclick = () => navigate('login');
     signupBtn.onclick = () => navigate('signup');
+    notificationBell.classList.add('hidden');
   }
 }
 
@@ -58,6 +62,7 @@ async function checkAuth() {
       const user = await res.json();
       currentUser = user;
       updateAuthUI();
+      fetchNotifications(); // Fetch notifications after successful auth check
     } else {
       clearUser();
     }
@@ -102,7 +107,7 @@ function renderQuests(list){
     const slots = Number(item.slots) || 1;
     const createdAt = new Date(item.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
     node.querySelector('.card-meta').textContent = `${item.location || '—'} • ${item.duration || '—'} • ${item.reward} FCFA • ${acceptedCount}/${slots} places • Publié le ${createdAt}`;
-    const actions = node.querySelector('.card-actions');
+    const actions = node.querySelector('.card-actions'); // Declare actions here
     actions.innerHTML = '';
     if (acceptedCount >= slots) {
       const span = document.createElement('span');
@@ -138,66 +143,110 @@ async function showQuestDetail(id){
     document.getElementById('q-description').innerHTML = (q.description || '—').replace(/\n/g,'<br>');
     document.getElementById('q-conditions').innerHTML = (q.conditions || 'Aucune condition spécifiée.').replace(/\n/g,'<br>');
     const acceptBtn = document.getElementById('acceptBtn');
-      const acceptedCount = (q.accepted || []).length;
-      const slots = Number(q.slots) || 1;
-      if (acceptedCount >= slots) {
-        acceptBtn.textContent = 'Quête pleine';
-        acceptBtn.disabled = true;
-        acceptBtn.classList.add('disabled');
-        acceptBtn.onclick = null;
-      } else {
-        acceptBtn.textContent = 'Accepter';
-        acceptBtn.disabled = false;
-        acceptBtn.onclick = async ()=>{
-          if(!currentUser){
-            toast('Vous devez être connecté pour accepter une quête');
-            navigate('login');
-            return;
-          }
-          if(!confirm('Voulez-vous accepter cette quête ?')) return;
-          try{
-            const res = await fetch('/api/quests/' + q.id + '/accept', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${getToken()}` }
-            });
-            if(res.ok){
-              const updated = await res.json();
-              toast('Quête acceptée');
-              // refresh detail view with updated data
-              showQuestDetail(updated.id);
-              fetchQuests();
-            } else {
-              const err = await res.json();
-              toast(err.error || 'Impossible d\'accepter');
-            }
-          }catch(err){
-            console.error(err);
-            toast('Erreur réseau');
-          }
-        };
-      }
+    const completeQuestSection = document.getElementById('completeQuestSection');
+    const completeQuestBtn = document.getElementById('completeQuestBtn');
+    const completionKeyInput = document.getElementById('completionKeyInput');
+
+    const acceptedCount = (q.accepted || []).length;
+    const slots = Number(q.slots) || 1;
+
+    // Reset UI elements
+    acceptBtn.style.display = 'block';
+    acceptBtn.textContent = 'Accepter';
+    acceptBtn.disabled = false;
+    acceptBtn.classList.remove('disabled');
+    acceptBtn.onclick = null;
+    completeQuestSection.classList.add('hidden');
+    completionKeyInput.value = '';
+
+    if (currentUser && q.creatorId && Number(currentUser.id) === Number(q.creatorId)) {
+      // Creator view
+      acceptBtn.style.display = 'none'; // Hide accept button for creator
       // Show delete button in detail if current user is creator
-      // remove existing delete button if any
       const buttonRow = document.querySelector('.button-row');
       const existingDel = document.getElementById('deleteBtn');
       if (existingDel) existingDel.remove();
-      if (currentUser && q.creatorId && Number(currentUser.id) === Number(q.creatorId)){
-        const del = document.createElement('button');
-        del.id = 'deleteBtn';
-        del.className = 'secondary';
-        del.textContent = 'Supprimer la quête';
-        del.addEventListener('click', ()=> deleteQuest(q.id));
-        buttonRow.appendChild(del);
-        // hide accept button for creator
-        acceptBtn.disabled = true;
-        acceptBtn.classList.add('disabled');
-        acceptBtn.onclick = null;
-      }
-    document.getElementById('callBtn').onclick = ()=>{
-      if(q.creatorPhone){
-        // open WhatsApp chat; normalize number by removing non digits
-        const normalized = (q.creatorPhone || '').replace(/\D/g,'');
-        if(normalized.length===0){
+      const del = document.createElement('button');
+      del.id = 'deleteBtn';
+      del.className = 'secondary';
+      del.textContent = 'Supprimer la quête';
+      del.addEventListener('click', () => deleteQuest(q.id));
+      buttonRow.appendChild(del);
+    } else if (currentUser && (q.accepted || []).includes(currentUser.id)) {
+      // Accepted by current user
+      acceptBtn.textContent = 'Quête acceptée';
+      acceptBtn.disabled = true;
+      acceptBtn.classList.add('disabled');
+      completeQuestSection.classList.remove('hidden');
+      completeQuestBtn.onclick = async () => {
+        const key = completionKeyInput.value;
+        if (!key) {
+          toast('Veuillez entrer la clé de complétion.');
+          return;
+        }
+        if (!confirm('Voulez-vous compléter cette quête ?')) return;
+        try {
+          const res = await fetch('/api/quests/' + q.id + '/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ key })
+          });
+          if (res.ok) {
+            toast('Quête complétée !');
+            showQuestDetail(q.id); // Refresh detail view
+            fetchQuests();
+            fetchNotifications();
+          } else {
+            const err = await res.json();
+            toast(err.error || 'Erreur lors de la complétion');
+          }
+        } catch (err) {
+          console.error(err);
+          toast('Erreur réseau');
+        }
+      };
+    } else if (acceptedCount >= slots) {
+      // Quest is full
+      acceptBtn.textContent = 'Quête pleine';
+      acceptBtn.disabled = true;
+      acceptBtn.classList.add('disabled');
+    } else {
+      // Quest is open and not accepted by current user
+      acceptBtn.textContent = 'Accepter';
+      acceptBtn.disabled = false;
+      acceptBtn.onclick = async () => {
+        if (!currentUser) {
+          toast('Vous devez être connecté pour accepter une quête');
+          navigate('login');
+          return;
+        }
+        if (!confirm('Voulez-vous accepter cette quête ?')) return;
+        try {
+          const res = await fetch('/api/quests/' + q.id + '/accept', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+          });
+          if (res.ok) {
+            const updated = await res.json();
+            toast('Quête acceptée');
+            showQuestDetail(updated.id); // Refresh detail view with updated data
+            fetchQuests();
+            fetchNotifications();
+          } else {
+            const err = await res.json();
+            toast(err.error || 'Impossible d\'accepter');
+          }
+        } catch (err) {
+          console.error(err);
+          toast('Erreur réseau');
+        }
+      };
+    }
+
+    document.getElementById('callBtn').onclick = () => {
+      if (q.creatorPhone) {
+        const normalized = (q.creatorPhone || '').replace(/\D/g, '');
+        if (normalized.length === 0) {
           alert('Numéro invalide');
           return;
         }
@@ -208,7 +257,7 @@ async function showQuestDetail(id){
       }
     };
     navigate('questDetail');
-  }catch(err){
+  } catch (err) {
     toast('Impossible de charger la quête.');
   }
 }
@@ -283,6 +332,74 @@ function iconFor(cat){
 }
 
 function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+// Notifications
+async function fetchNotifications() {
+  if (!currentUser) {
+    document.getElementById('notificationBell').classList.add('hidden');
+    return;
+  }
+  try {
+    const res = await fetch('/api/user/notifications', {
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    });
+    if (res.ok) {
+      const notifications = await res.json();
+      const unreadCount = notifications.filter(n => !n.read).length;
+      document.getElementById('notificationCount').textContent = unreadCount;
+      if (unreadCount > 0) {
+        document.getElementById('notificationCount').classList.remove('hidden');
+      } else {
+        document.getElementById('notificationCount').classList.add('hidden');
+      }
+      renderNotifications(notifications);
+    }
+  } catch (err) {
+    console.error('Error fetching notifications:', err);
+  }
+}
+
+function renderNotifications(notifications) {
+  const notificationList = document.getElementById('notificationList');
+  notificationList.innerHTML = '';
+  if (notifications.length === 0) {
+    notificationList.innerHTML = '<p>Aucune notification.</p>';
+    return;
+  }
+  notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort by newest first
+  notifications.forEach(n => {
+    const item = document.createElement('div');
+    item.className = `notification-item ${n.read ? 'read' : 'unread'}`;
+    item.innerHTML = `
+      <p>${n.message}</p>
+      <span>${new Date(n.timestamp).toLocaleString('fr-FR')}</span>
+    `;
+    item.addEventListener('click', () => markNotificationAsRead(n.id));
+    notificationList.appendChild(item);
+  });
+}
+
+async function markNotificationAsRead(id) {
+  try {
+    const res = await fetch(`/api/user/notifications/${id}/read`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    });
+    if (res.ok) {
+      fetchNotifications(); // Refresh notifications
+    }
+  } catch (err) {
+    console.error('Error marking notification as read:', err);
+  }
+}
+
+function openNotificationModal() {
+  document.getElementById('notificationModal').classList.remove('hidden');
+}
+
+function closeNotificationModal() {
+  document.getElementById('notificationModal').classList.add('hidden');
+}
 
 async function showUserProfile() {
   if (!currentUser) {
@@ -534,6 +651,8 @@ document.getElementById('loginBtn')?.addEventListener('click', () => {
 document.getElementById('signupBtn')?.addEventListener('click', () => {
   navigate('signup');
 });
+
+document.getElementById('notificationBell')?.addEventListener('click', openNotificationModal);
 
 // Fake login/signup (tu mettras ton backend plus tard)
 document.getElementById('loginForm')?.addEventListener('submit', async e => {

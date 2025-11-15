@@ -22,8 +22,17 @@
       <button id="loginBtn">Se connecter</button>
       <button id="signupBtn">S'inscrire</button>
       <div id="userMenu" class="user-menu hidden"></div>
+      <div id="notificationBell" class="notification-bell hidden">🔔<span id="notificationCount" class="notification-count">0</span></div>
     </div>
   </header>
+
+  <div id="notificationModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Notifications</h2>
+      <div id="notificationList"></div>
+      <button class="secondary" onclick="closeNotificationModal()">Fermer</button>
+    </div>
+  </div>
 <section id="login" class="page auth-page">
   <div class="auth-container">
     <div class="panel auth">
@@ -219,6 +228,14 @@
           <button id=acceptBtn class=accept-button> Accepter</button>
           <button id=callBtn class=call-button> Appeler</button>
         </div>
+        <div id="completeQuestSection" class="section hidden">
+          <h2 class="section-title">Compléter la quête</h2>
+          <div class="form-group">
+            <label for="completionKeyInput">Clé de complétion</label>
+            <input type="text" id="completionKeyInput" placeholder="Entrez la clé de complétion">
+          </div>
+          <button id="completeQuestBtn" class="primary">Compléter la quête</button>
+        </div>
         <button id=backBtn class=back-button onclick="navigate('explore')"> Retour</button>
       </div>
     </section>
@@ -325,5 +342,3 @@
   <script src="/app.js"></script>
 </body>
 </html>
-
-

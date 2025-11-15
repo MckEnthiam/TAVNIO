@@ -370,8 +370,6 @@ body::before {
   gap: 15px;
   flex-wrap: wrap;
   margin-bottom: 15px;
-  font-size: 0.9rem;
-  color: rgba(255,255,255,0.7);
 }
 
 .full-badge {
@@ -432,6 +430,91 @@ textarea { min-height: 120px; resize: vertical; }
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 .hidden { display: none; }
+
+/* Notification Bell */
+.notification-bell {
+  position: relative;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: white;
+  margin-left: 15px;
+}
+
+.notification-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.7rem;
+  padding: 3px 7px;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+/* Notification Modal */
+#notificationModal .modal-content {
+  max-width: 400px;
+}
+
+#notificationList {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  background: rgba(255,255,255,0.1);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.notification-item:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.notification-item.read {
+  opacity: 0.7;
+}
+
+.notification-item p {
+  margin-bottom: 5px;
+  font-size: 0.95rem;
+}
+
+.notification-item span {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+}
+
+/* Form group for completion key */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form-group input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-size: 1rem;
+}
+
+.form-group input[type="text"]::placeholder {
+  color: rgba(255,255,255,0.5);
+}
 
 /* --- RESPONSIVE --- */
 @media (max-width: 968px) {
