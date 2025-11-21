@@ -636,6 +636,29 @@ Your analysis:`;
   });
 });
 
+app.get('/api/logs', (req, res) => {
+  const logFilePath = path.join(__dirname, 'suspicious_activities.log');
+  fs.readFile(logFilePath, 'utf8', (err, data) => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        // If the file doesn't exist, create it and return an empty string
+        fs.writeFile(logFilePath, '', (writeErr) => {
+          if (writeErr) {
+            console.error('Error creating log file:', writeErr);
+            return res.status(500).send('Failed to create log file.');
+          }
+          return res.send('');
+        });
+      } else {
+        console.error('Error reading log file:', err);
+        return res.status(500).send('Failed to read log file.');
+      }
+    } else {
+      res.send(data);
+    }
+  });
+});
+
 // start
 initDB().then(() => {
   server.listen(PORT, () => console.log('Server running on', PORT));

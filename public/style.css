@@ -1634,3 +1634,21 @@ button:focus { outline: none; }
     padding: 4px 6px;
   }
 }
+
+/* Log Analysis Result */
+.log-analysis-result {
+  margin-top: 20px;
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+#analysisOutput {
+  background-color: #1a1a1a;
+  color: #0f0;
+  font-family: monospace;
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
+}

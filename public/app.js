@@ -784,7 +784,7 @@ function setupAiChat() {
   const closeBtn = document.getElementById('closeAiChat');
   const form = document.getElementById('aiChatForm');
   const input = document.getElementById('aiChatInput');
-  const messagesContainer = document.getElementById('aiChatMessages');
+  const messagesContainer = document.getElemencryId('aiChatMessages');
 
   if (!opener || !widget || !closeBtn || !form) {
     console.error('One or more AI chat elements are missing from the DOM.');
@@ -918,5 +918,26 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
     }
   } catch (err) {
     toast('Erreur lors de l\'inscription');
+  }
+});
+
+document.getElementById('analyzeLogsBtn')?.addEventListener('click', async () => {
+  const code = prompt("Entrez le code d'administrateur :");
+  if (code === 'TAVN0375') {
+    try {
+      const res = await fetch('/api/logs');
+      if (res.ok) {
+        const logs = await res.text();
+        document.getElementById('analysisOutput').textContent = logs;
+        document.getElementById('analysisResult').classList.remove('hidden');
+      } else {
+        toast('Erreur de chargement des logs');
+      }
+    } catch (err) {
+      console.error('Log fetch error:', err);
+      toast('Erreur de chargement des logs');
+    }
+  } else {
+    toast('Code incorrect');
   }
 });
