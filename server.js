@@ -9,10 +9,29 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const bcrypt = require('bcrypt');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const { logSuspiciousActivity } = require('./logger');
+require('dotenv').config();
+
+/**
+ * Parses a duration string (e.g., '2h', '30m') into minutes.
+ * @param {string} durationStr - The duration string.
+ * @returns {number|null} - The duration in minutes, or null if invalid.
+ */
+function parseDurationToMinutes(durationStr) {
+  if (!durationStr || typeof durationStr !== 'string') return null;
+  const match = durationStr.match(/^(\d+)(h|m)$/);
+  if (!match) return null;
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  if (unit === 'h') return value * 60;
+  if (unit === 'm') return value;
+  return null;
+}
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = "AIzaSyC3ib6Kg1RnqjT5R8Sx7ax8Ew1v8nxsyr0";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Fail fast if critical environment variables are missing
 if (!GEMINI_API_KEY) {
@@ -159,12 +178,12 @@ app.post('/api/quests/:id/accept', authenticateUser, async (req, res) => {
   quest.slots = Number(quest.slots) || 1;
   quest.accepted = quest.accepted || [];
 
-  if (quest.accepted.includes(userId)) return res.status(400).json({ error: 'Already accepted' });
+  if (quest.accepted.some(a => a.userId === userId)) return res.status(400).json({ error: 'Already accepted' });
   // prevent quest creator from accepting their own quest
   if (quest.creatorId && Number(quest.creatorId) === userId) return res.status(400).json({ error: 'Cannot accept your own quest' });
   if (quest.accepted.length >= quest.slots) return res.status(400).json({ error: 'Full' });
 
-  quest.accepted.push(userId);
+  quest.accepted.push({ userId, acceptedAt: new Date().toISOString() });
   // optionally change status when full
   if (quest.accepted.length >= quest.slots) quest.status = 'full';
 
@@ -198,19 +217,65 @@ app.post('/api/quests/:id/complete', authenticateUser, async (req, res) => {
   const userId = req.user.id;
   const { key } = req.body;
 
-  if (!quest.accepted.includes(userId)) return res.status(403).json({ error: 'You have not accepted this quest' });
+  const acceptance = quest.accepted.find(a => a.userId === userId);
+  if (!acceptance) return res.status(403).json({ error: 'You have not accepted this quest' });
+
   if (quest.status === 'completed') return res.status(400).json({ error: 'Quest already completed' });
   if (quest.completionKey !== key) return res.status(400).json({ error: 'Invalid completion key' });
 
+  // Suspicious activity detection
+  const expectedDurationMinutes = parseDurationToMinutes(quest.duration);
+  if (expectedDurationMinutes) {
+    const acceptedAt = new Date(acceptance.acceptedAt);
+    const completedAt = new Date();
+    const actualDurationMinutes = (completedAt - acceptedAt) / (1000 * 60);
+
+    const tooFastThreshold = expectedDurationMinutes * 0.25; // 25% of expected time
+    const tooSlowThreshold = expectedDurationMinutes * 2;   // 200% of expected time
+
+    if (actualDurationMinutes < tooFastThreshold) {
+      logSuspiciousActivity('QUEST_COMPLETION_TIME', {
+        questId: quest.id,
+        userId,
+        reason: 'completed too fast',
+        expectedMinutes: expectedDurationMinutes,
+        actualMinutes: actualDurationMinutes,
+      });
+    } else if (actualDurationMinutes > tooSlowThreshold) {
+      logSuspiciousActivity('QUEST_COMPLETION_TIME', {
+        questId: quest.id,
+        userId,
+        reason: 'completed too slow',
+        expectedMinutes: expectedDurationMinutes,
+        actualMinutes: actualDurationMinutes,
+      });
+    }
+  }
+
   quest.status = 'completed';
   quest.completedBy = userId; // Store who completed it
+  quest.completedAt = new Date().toISOString(); // Store completion time
+
   // Remove from accepted list
-  quest.accepted = quest.accepted.filter(id => id !== userId);
+  quest.accepted = quest.accepted.filter(a => a.userId !== userId);
 
   // Reward the user who completed the quest
   const completer = db.data.users.find(u => u.id === userId);
   if (completer) {
     completer.balance = (completer.balance || 0) + quest.reward;
+    // Add to user's completed quests history for spam detection
+    completer.completedQuests = completer.completedQuests || [];
+    completer.completedQuests.push({ questId: quest.id, completedAt: quest.completedAt });
+
+    // Spam detection
+    const oneHourAgo = new Date(new Date().getTime() - (60 * 60 * 1000));
+    const recentCompletions = completer.completedQuests.filter(q => new Date(q.completedAt) > oneHourAgo);
+    if (recentCompletions.length > 5) {
+      logSuspiciousActivity('SPAM_QUEST_COMPLETION', {
+        userId,
+        completionsInLastHour: recentCompletions.length,
+      });
+    }
   }
 
   // Notify the quest creator that the quest has been completed
@@ -264,7 +329,7 @@ app.post('/api/search/ai', async (req, res) => {
       return res.status(400).json({ error: 'Query required' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
     const questsList = db.data.quests.map(q => ({
       id: q.id,
       title: q.title,
@@ -321,7 +386,7 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
     const prompt = `You are TAVNO-AI, a friendly and helpful assistant for a quest-finding web app called TAVNO.
 
@@ -354,7 +419,7 @@ app.post('/api/quests/:id/leave', authenticateUser, async (req, res) => {
   const userId = req.user.id;
 
   quest.accepted = quest.accepted || [];
-  const idx = quest.accepted.indexOf(userId);
+  const idx = quest.accepted.findIndex(a => a.userId === userId);
   if (idx === -1) return res.status(400).json({ error: 'You have not accepted this quest' });
 
   // remove user from accepted
@@ -525,6 +590,50 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
   quest.reviews[reviewKey] = true;
   await db.write();
   res.status(201).json({ success: true });
+});
+
+// TODO: This endpoint should be protected and only accessible by administrators.
+app.post('/api/admin/analyze-logs', async (req, res) => {
+  const logFilePath = path.join(__dirname, 'suspicious_activities.log');
+  
+  fs.readFile(logFilePath, 'utf8', async (err, data) => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        return res.status(404).json({ error: 'Log file not found. No suspicious activities logged yet.' });
+      }
+      console.error('Error reading log file:', err);
+      return res.status(500).json({ error: 'Failed to read log file.' });
+    }
+
+    if (!data.trim()) {
+      return res.json({ analysis: 'Log file is empty. No suspicious activities to analyze.' });
+    }
+
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      const prompt = `You are a security analyst AI for a platform called TAVNO.
+The following is a log file of suspicious activities. Each line is a JSON object representing an event.
+
+Analyze these logs to identify potential abuse, patterns of misbehavior, or security risks.
+Provide a summary of your findings. Highlight any users who appear frequently or any particularly concerning activities.
+
+Log data:
+---
+${data}
+---
+
+Your analysis:`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const analysis = response.text();
+
+      res.json({ analysis });
+    } catch (aiErr) {
+      console.error('AI log analysis error:', aiErr);
+      res.status(500).json({ error: 'AI log analysis failed', details: aiErr.message });
+    }
+  });
 });
 
 // start

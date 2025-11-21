@@ -17,6 +17,7 @@
       <button class="nav-btn" data-target="explore">Explorer</button>
       <button class="nav-btn" data-target="publish">Publier</button>
        <button class="nav-btn" data-target="about">À propos</button>
+       <button class="nav-btn" data-target="admin">Admin</button>
     </nav>
     <div class="auth">
       <button id="loginBtn">Se connecter</button>
@@ -33,6 +34,24 @@
       <button class="secondary" onclick="closeNotificationModal()">Fermer</button>
     </div>
   </div>
+
+<section id="admin" class="page">
+  <div class="panel">
+    <h2>Panneau d'Administration</h2>
+    <div class="section">
+      <h3 class="section-title">Analyse des Activités Suspectes</h3>
+      <p>Utilisez l'IA Gemini pour analyser les logs d'activités suspectes et détecter les comportements anormaux.</p>
+      <div class="form-actions">
+        <button id="analyzeLogsBtn" class="primary">Lancer l'analyse</button>
+      </div>
+      <div id="analysisResult" class="log-analysis-result hidden">
+        <h4>Résultat de l'analyse :</h4>
+        <pre id="analysisOutput"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="login" class="page auth-page">
   <div class="auth-container">
     <div class="panel auth">

@@ -733,9 +733,6 @@ document.getElementById('reviewForm')?.addEventListener('submit', async (e) => {
   }
 });
 
-  }
-});
-
 function setupWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${protocol}//${window.location.host}`);
