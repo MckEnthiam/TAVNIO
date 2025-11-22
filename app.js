@@ -902,6 +902,45 @@ function setupAiChat() {
     return msgDiv;
   }
 
+  // Streamed/typed AI reply to simulate a real AI typing
+  function streamAiReply(text, options = {}) {
+    const typingSpeed = options.typingSpeed || 25; // ms per char
+    const preDelay = options.preDelay || 600; // ms before typing starts
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('ai-chat-message', 'ai');
+    messagesContainer.appendChild(msgDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    setTimeout(() => {
+      let i = 0;
+      const t = setInterval(() => {
+        msgDiv.textContent += text.charAt(i);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        i++;
+        if (i >= text.length) clearInterval(t);
+      }, typingSpeed);
+    }, preDelay);
+    return msgDiv;
+  }
+
+  // Simple rule-based pseudo-AI generator for presentation/demo purposes
+  function generatePseudoReply(message) {
+    const m = message.trim();
+    const low = m.toLowerCase();
+
+    // Exact trigger (presentation)
+    if (low === 'tiens voici un test') return 'Comment puis-je vous aider ?';
+
+    // Some simple pattern-based replies
+    if (/bonjour|salut|bonsoir/.test(low)) return "Bonjour ! Je suis l'assistant TAVNO-AI. Comment puis-je vous aider ?";
+    if (/qu[eé]te|quêtes|questes/.test(low)) return "Je peux chercher des quêtes pour vous ou vous aider à en publier une. Que souhaitez-vous ?";
+    if (/aide|aidez|aider/.test(low)) return "Dites-moi ce dont vous avez besoin et je ferai de mon mieux pour aider.";
+    if (/merci/.test(low)) return "Avec plaisir ! Si vous avez d'autres questions, je suis là.";
+
+    // Fallback: return null so the client will call the real AI endpoint
+    return null;
+  }
+
   opener.addEventListener('click', () => {
     logInteraction('AI Chat widget opened', 'special');
     widget.classList.remove('hidden');
@@ -927,13 +966,21 @@ function setupAiChat() {
     addMessage(userMessage, 'user');
     input.value = '';
 
-    // Presentation-only trigger: respond locally without calling the real AI
+    // Pseudo-AI mode: try to generate a local reply first
     try {
-      if (userMessage.toLowerCase() === 'tiens voici un test') {
-        addMessage("Comment puis-je vous aider ?", 'ai');
+      const pseudo = generatePseudoReply(userMessage);
+      if (pseudo) {
+        // small randomized thinking delay to feel realistic
+        const thinkDelay = 400 + Math.floor(Math.random() * 800);
+        const loading = addMessage('', 'ai', true);
+        setTimeout(() => {
+          loading.remove();
+          streamAiReply(pseudo, { typingSpeed: 20, preDelay: 120 });
+        }, thinkDelay);
         return;
       }
 
+      // No local pseudo reply: fall back to real AI endpoint
       const loadingIndicator = addMessage('', 'ai', true);
 
       const res = await fetch('/api/ai/chat', {
@@ -945,7 +992,8 @@ function setupAiChat() {
       loadingIndicator.remove();
 
       if (res.ok) {
-        addMessage(data.reply, 'ai');
+        // Use streaming display for real replies, too
+        streamAiReply(data.reply || (data.result || ''), { typingSpeed: 18, preDelay: 100 });
       } else {
         addMessage(`Erreur: ${data.error || "Une erreur s'est produite."}`, 'ai');
       }
