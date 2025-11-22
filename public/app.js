@@ -1,8 +1,31 @@
 const apiBase = '';
 let currentUser = null;
 
+// Custom Logger
+function logInteraction(message, type = 'info') {
+  const colors = {
+    info: '#2196F3', // Blue
+    success: '#4CAF50', // Green
+    warning: '#FFC107', // Amber
+    error: '#F44336', // Red
+    special: '#9C27B0', // Purple
+    auth: '#FF5722', // Deep Orange
+    ui: '#00BCD4' // Cyan
+  };
+
+  const color = colors[type] || 'black';
+
+  console.log(`%c[Interaction] ${message}`, `color: ${color}; font-weight: bold;`);
+
+  if (Math.random() < 0.15) { // 15% chance
+    console.log('%c✨ gemini says everything is okay ✨', 'color: #E91E63; font-style: italic;');
+  }
+}
+
+
 // Auth state management
 function setUser(user, token) {
+  logInteraction(`User set: ${user.name}`, 'auth');
   currentUser = user;
   localStorage.setItem('authToken', token);
   localStorage.setItem('user', JSON.stringify(user));
@@ -10,6 +33,7 @@ function setUser(user, token) {
 }
 
 function clearUser() {
+  logInteraction('User cleared / Déconnexion', 'auth');
   currentUser = null;
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
@@ -22,14 +46,15 @@ function getToken() {
 }
 
 function updateAuthUI() {
+  logInteraction('Updating authentication UI', 'ui');
   const loginBtn = document.getElementById('loginBtn');
   const signupBtn = document.getElementById('signupBtn');
   const userMenu = document.getElementById('userMenu');
   const notificationBell = document.getElementById('notificationBell');
-  
+
   if (currentUser) {
-    const avatar = currentUser.avatar && !currentUser.avatar.includes('default') 
-      ? `<img src="${currentUser.avatar}" class="navbar-avatar">` 
+    const avatar = currentUser.avatar && !currentUser.avatar.includes('default')
+      ? `<img src="${currentUser.avatar}" class="navbar-avatar">`
       : '<span class="navbar-avatar-text">👤</span>';
     loginBtn.innerHTML = `${avatar} <span>${currentUser.name}</span>`;
     loginBtn.style.display = 'flex';
@@ -54,6 +79,7 @@ function updateAuthUI() {
 }
 
 async function checkAuth() {
+  logInteraction('Checking authentication status', 'auth');
   const token = getToken();
   if (!token) return;
   try {
@@ -68,36 +94,41 @@ async function checkAuth() {
     }
   } catch (err) {
     console.error('Auth check failed:', err);
+    logInteraction('Authentication check failed', 'error');
   }
 }
 
-function navigate(page){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+function navigate(page) {
+  logInteraction(`Navigating to page: ${page}`, 'info');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(page).classList.add('active');
 }
 
-function toast(msg){
+function toast(msg) {
+  logInteraction(`Toast displayed: "${msg}"`, 'ui');
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.remove('hidden');
-  setTimeout(()=>t.classList.add('hidden'), 3000);
+  setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-async function fetchQuests(){
+async function fetchQuests() {
+  logInteraction('Fetching quests', 'info');
   const q = document.getElementById('searchInput')?.value || '';
   const cat = document.getElementById('categorySelect')?.value || '';
   const params = new URLSearchParams();
-  if(cat) params.set('category', cat);
-  if(q) params.set('q', q);
+  if (cat) params.set('category', cat);
+  if (q) params.set('q', q);
   const res = await fetch('/api/quests?' + params.toString());
   const list = await res.json();
   renderQuests(list);
 }
 
-function renderQuests(list){
+function renderQuests(list) {
+  logInteraction(`Rendering ${list.length} quests`, 'ui');
   const grid = document.getElementById('questsGrid');
   grid.innerHTML = '';
   const tpl = document.getElementById('questCardTpl');
-  list.forEach(item=>{
+  list.forEach(item => {
     const node = tpl.content.cloneNode(true);
     const img = node.querySelector('.card-img');
     img.src = item.image || '/placeholder.jpg';
@@ -118,17 +149,18 @@ function renderQuests(list){
       const btn = document.createElement('button');
       btn.className = 'view';
       btn.textContent = 'Voir';
-      btn.addEventListener('click', ()=> showQuestDetail(item.id));
+      btn.addEventListener('click', () => showQuestDetail(item.id));
       actions.appendChild(btn);
     }
     grid.appendChild(node);
   });
 }
 
-async function showQuestDetail(id){
-  try{
+async function showQuestDetail(id) {
+  logInteraction(`Showing quest detail for ID: ${id}`, 'info');
+  try {
     const res = await fetch('/api/quests/' + id);
-    if(!res.ok) throw new Error('Not found');
+    if (!res.ok) throw new Error('Not found');
     const q = await res.json();
     document.getElementById('q-title').textContent = q.title || 'Titre';
     document.getElementById('q-image').src = q.image || '/placeholder.jpg';
@@ -138,14 +170,14 @@ async function showQuestDetail(id){
 
 
     meta.innerHTML = '';
-    if(q.category) meta.appendChild(makeBadge(iconFor(q.category) + ' ' + capitalize(q.category)));
-    if(q.duration) meta.appendChild(makeBadge('⏱️ ' + q.duration));
-    if(q.creator) meta.appendChild(makeBadge('👤 ' + q.creator));
+    if (q.category) meta.appendChild(makeBadge(iconFor(q.category) + ' ' + capitalize(q.category)));
+    if (q.duration) meta.appendChild(makeBadge('⏱️ ' + q.duration));
+    if (q.creator) meta.appendChild(makeBadge('👤 ' + q.creator));
     document.getElementById('q-location').textContent = q.location || '—';
     document.getElementById('q-reward').textContent = (q.reward ? q.reward + ' FCFA' : '—');
     document.getElementById('q-duration').textContent = q.duration || '—';
-    document.getElementById('q-description').innerHTML = (q.description || '—').replace(/\n/g,'<br>');
-    document.getElementById('q-conditions').innerHTML = (q.conditions || 'Aucune condition spécifiée.').replace(/\n/g,'<br>');
+    document.getElementById('q-description').innerHTML = (q.description || '—').replace(/\n/g, '<br>');
+    document.getElementById('q-conditions').innerHTML = (q.conditions || 'Aucune condition spécifiée.').replace(/\n/g, '<br>');
     const acceptBtn = document.getElementById('acceptBtn');
     const completeQuestSection = document.getElementById('completeQuestSection');
     const completeQuestBtn = document.getElementById('completeQuestBtn');
@@ -165,6 +197,7 @@ async function showQuestDetail(id){
 
     if (currentUser && q.creatorId && Number(currentUser.id) === Number(q.creatorId)) {
       // Creator view
+      logInteraction('Displaying quest detail for creator', 'special');
       acceptBtn.style.display = 'none'; // Hide accept button for creator
       // Show delete button in detail if current user is creator
       const buttonRow = document.querySelector('.button-row');
@@ -178,11 +211,13 @@ async function showQuestDetail(id){
       buttonRow.appendChild(del);
     } else if (currentUser && (q.accepted || []).includes(currentUser.id)) {
       // Accepted by current user
+      logInteraction('Displaying quest detail for accepted user', 'info');
       acceptBtn.textContent = 'Quête acceptée';
       acceptBtn.disabled = true;
       acceptBtn.classList.add('disabled');
       completeQuestSection.classList.remove('hidden');
       completeQuestBtn.onclick = async () => {
+        logInteraction(`Attempting to complete quest ${q.id}`, 'success');
         const key = completionKeyInput.value;
         if (!key) {
           toast('Veuillez entrer la clé de complétion.');
@@ -211,14 +246,17 @@ async function showQuestDetail(id){
       };
     } else if (acceptedCount >= slots) {
       // Quest is full
+      logInteraction('Displaying quest detail for a full quest', 'warning');
       acceptBtn.textContent = 'Quête pleine';
       acceptBtn.disabled = true;
       acceptBtn.classList.add('disabled');
     } else {
       // Quest is open and not accepted by current user
+      logInteraction('Displaying quest detail for a potential participant', 'info');
       acceptBtn.textContent = 'Accepter';
       acceptBtn.disabled = false;
       acceptBtn.onclick = async () => {
+        logInteraction(`Attempting to accept quest ${q.id}`, 'success');
         if (!currentUser) {
           toast('Vous devez être connecté pour accepter une quête');
           navigate('login');
@@ -248,6 +286,7 @@ async function showQuestDetail(id){
     }
 
     document.getElementById('callBtn').onclick = () => {
+      logInteraction('Call button clicked', 'info');
       if (q.creatorPhone) {
         const normalized = (q.creatorPhone || '').replace(/\D/g, '');
         if (normalized.length === 0) {
@@ -263,69 +302,72 @@ async function showQuestDetail(id){
     navigate('questDetail');
   } catch (err) {
     toast('Impossible de charger la quête.');
+    logInteraction('Failed to load quest detail', 'error');
   }
 }
 
-function makeBadge(text){
+function makeBadge(text) {
   const s = document.createElement('span');
   s.className = 'meta-badge';
   s.textContent = text;
   return s;
 }
 
-async function deleteQuest(id){
-  if(!confirm('Supprimer cette quête ? Cette action est irréversible.')) return;
-  try{
+async function deleteQuest(id) {
+  logInteraction(`Attempting to delete quest ${id}`, 'error');
+  if (!confirm('Supprimer cette quête ? Cette action est irréversible.')) return;
+  try {
     const res = await fetch('/api/quests/' + id, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${getToken()}` }
     });
-    if(res.ok){
+    if (res.ok) {
       toast('Quête supprimée');
       fetchQuests();
       // refresh profile view if open
-      if(document.getElementById('userProfile').classList.contains('active')) showUserProfile();
+      if (document.getElementById('userProfile').classList.contains('active')) showUserProfile();
       // if currently viewing this quest detail, go back
       const qDetail = document.getElementById('questDetail');
-      if(qDetail.classList.contains('active')) navigate('explore');
+      if (qDetail.classList.contains('active')) navigate('explore');
     } else {
       const err = await res.json();
       toast(err.error || 'Erreur lors de la suppression');
     }
-  }catch(err){
+  } catch (err) {
     console.error(err);
     toast('Erreur réseau');
   }
 }
 
-async function leaveQuest(id){
-  if(!confirm('Voulez-vous abandonner cette quête ?')) return;
-  try{
+async function leaveQuest(id) {
+  logInteraction(`Attempting to leave quest ${id}`, 'warning');
+  if (!confirm('Voulez-vous abandonner cette quête ?')) return;
+  try {
     const res = await fetch('/api/quests/' + id + '/leave', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getToken()}` }
     });
-    if(res.ok){
+    if (res.ok) {
       const updated = await res.json();
       toast('Vous avez abandonné la quête');
       fetchQuests();
       // refresh profile view if open
-      if(document.getElementById('userProfile').classList.contains('active')) showUserProfile();
+      if (document.getElementById('userProfile').classList.contains('active')) showUserProfile();
       // if currently viewing this quest detail, refresh it
       const qDetail = document.getElementById('questDetail');
-      if(qDetail.classList.contains('active')) showQuestDetail(updated.id);
+      if (qDetail.classList.contains('active')) showQuestDetail(updated.id);
     } else {
       const err = await res.json();
       toast(err.error || 'Impossible d\'abandonner');
     }
-  }catch(err){
+  } catch (err) {
     console.error(err);
     toast('Erreur réseau');
   }
 }
 
-function iconFor(cat){
-  switch((cat||'').toLowerCase()){
+function iconFor(cat) {
+  switch ((cat || '').toLowerCase()) {
     case 'transport': return '🚚';
     case 'achats': return '🛒';
     case 'aide': return '🤝';
@@ -335,7 +377,7 @@ function iconFor(cat){
   }
 }
 
-function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // Notifications
 async function fetchNotifications() {
@@ -343,6 +385,7 @@ async function fetchNotifications() {
     document.getElementById('notificationBell').classList.add('hidden');
     return;
   }
+  logInteraction('Fetching notifications', 'info');
   try {
     const res = await fetch('/api/user/notifications', {
       headers: { 'Authorization': `Bearer ${getToken()}` }
@@ -360,6 +403,7 @@ async function fetchNotifications() {
     }
   } catch (err) {
     console.error('Error fetching notifications:', err);
+    logInteraction('Failed to fetch notifications', 'error');
   }
 }
 
@@ -384,6 +428,7 @@ function renderNotifications(notifications) {
 }
 
 async function markNotificationAsRead(id) {
+  logInteraction(`Marking notification as read: ${id}`, 'success');
   try {
     const res = await fetch(`/api/user/notifications/${id}/read`, {
       method: 'POST',
@@ -398,10 +443,12 @@ async function markNotificationAsRead(id) {
 }
 
 function openNotificationModal() {
+  logInteraction('Opening notification modal', 'ui');
   document.getElementById('notificationModal').classList.remove('hidden');
 }
 
 function closeNotificationModal() {
+  logInteraction('Closing notification modal', 'ui');
   document.getElementById('notificationModal').classList.add('hidden');
 }
 
@@ -410,15 +457,16 @@ async function showUserProfile() {
     navigate('login');
     return;
   }
+  logInteraction('Showing user profile', 'info');
   document.getElementById('profile-name').textContent = currentUser.name;
   document.getElementById('profile-email').textContent = currentUser.email;
-    document.getElementById('profile-phone').textContent = currentUser.phone || '';
+  document.getElementById('profile-phone').textContent = currentUser.phone || '';
   document.getElementById('profile-balance').textContent = currentUser.balance + ' FCFA';
   document.getElementById('profile-rating').innerHTML = ''; // Clear previous rating
   document.getElementById('profile-created').textContent = '—';
   document.getElementById('profile-completed').textContent = '—';
   document.getElementById('profile-in-progress').textContent = '—';
-  
+
   // Display bio
   const bioEl = document.getElementById('profile-bio');
   if (currentUser.bio) {
@@ -426,7 +474,7 @@ async function showUserProfile() {
   } else {
     bioEl.textContent = '';
   }
-  
+
   // Display avatar
   const avatarEl = document.getElementById('profile-avatar-img');
   if (currentUser.avatar && !currentUser.avatar.includes('default')) {
@@ -436,7 +484,7 @@ async function showUserProfile() {
     avatarEl.style.backgroundImage = 'none';
     avatarEl.textContent = '👤';
   }
-  
+
   // Fetch and show user's quests
   try {
     const [questsRes, userProfileRes] = await Promise.all([fetch('/api/quests'), fetch(`/api/users/${currentUser.id}`)]);
@@ -509,8 +557,9 @@ async function showUserProfile() {
 
   } catch (err) {
     console.error('Error loading user quests:', err);
+    logInteraction('Failed to load user quests', 'error');
   }
-  
+
   navigate('userProfile');
 }
 
@@ -525,10 +574,11 @@ function renderStars(rating, max = 5) {
 
 // publish
 const publishForm = document.getElementById('publishForm');
-if(publishForm){
-  publishForm.addEventListener('submit', async (e)=>{
+if (publishForm) {
+  publishForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if(!currentUser) {
+    logInteraction('Publish form submitted', 'success');
+    if (!currentUser) {
       toast('Vous devez être connecté pour publier une quête');
       navigate('login');
       return;
@@ -537,19 +587,19 @@ if(publishForm){
     fd.set('creator', currentUser.name);
     fd.set('creatorId', currentUser.id);
     if (currentUser.phone) fd.set('creatorPhone', currentUser.phone);
-    try{
-      const res = await fetch('/api/quests', { 
-        method: 'POST', 
+    try {
+      const res = await fetch('/api/quests', {
+        method: 'POST',
         body: fd,
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
-      if(!res.ok) throw new Error('Erreur serveur');
+      if (!res.ok) throw new Error('Erreur serveur');
       const created = await res.json();
       toast('Quête publiée');
       navigate('explore');
       fetchQuests();
       publishForm.reset();
-    }catch(err){
+    } catch (err) {
       toast('Erreur lors de la publication');
     }
   })
@@ -557,6 +607,7 @@ if(publishForm){
 
 // Profile editing
 function openEditModal() {
+  logInteraction('Opening edit profile modal', 'ui');
   const modal = document.getElementById('editProfileModal');
   document.getElementById('editName').value = currentUser.name;
   document.getElementById('editBio').value = currentUser.bio || '';
@@ -565,6 +616,7 @@ function openEditModal() {
 }
 
 function closeEditModal() {
+  logInteraction('Closing edit profile modal', 'ui');
   document.getElementById('editProfileModal').classList.add('hidden');
 }
 
@@ -579,6 +631,7 @@ function updateAvatarPreview(avatarUrl) {
 }
 
 document.getElementById('avatarInput')?.addEventListener('change', (e) => {
+  logInteraction('Avatar file selected', 'info');
   const file = e.target.files[0];
   if (file) {
     const reader = new FileReader();
@@ -592,23 +645,24 @@ document.getElementById('avatarInput')?.addEventListener('change', (e) => {
 
 document.getElementById('editProfileForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
+  logInteraction('Edit profile form submitted', 'success');
   const fd = new FormData();
   fd.append('name', document.getElementById('editName').value);
   fd.append('bio', document.getElementById('editBio').value);
   fd.append('phone', document.getElementById('editPhone').value || '');
-  
+
   const avatarInput = document.getElementById('avatarInput');
   if (avatarInput.files.length > 0) {
     fd.append('avatar', avatarInput.files[0]);
   }
-  
+
   try {
     const res = await fetch('/api/user/profile', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getToken()}` },
       body: fd
     });
-    
+
     if (res.ok) {
       const updatedUser = await res.json();
       setUser(updatedUser, getToken());
@@ -626,32 +680,39 @@ document.getElementById('editProfileForm')?.addEventListener('submit', async (e)
 document.getElementById('editProfileBtn')?.addEventListener('click', openEditModal);
 
 // events
-document.getElementById('searchInput')?.addEventListener('input', () => fetchQuests());
-document.getElementById('categorySelect')?.addEventListener('change', () => fetchQuests());
+document.getElementById('searchInput')?.addEventListener('input', () => {
+  logInteraction('Search input changed', 'info');
+  fetchQuests();
+});
+document.getElementById('categorySelect')?.addEventListener('change', () => {
+  logInteraction('Category select changed', 'info');
+  fetchQuests();
+});
 
 // AI Search functionality with Gemini
 document.getElementById('aiSearchBtn')?.addEventListener('click', async () => {
+  logInteraction('AI Search button clicked', 'special');
   const query = document.getElementById('searchInput')?.value || '';
   if (!query.trim()) {
     toast('Entrez un terme de recherche pour utiliser l\'IA');
     return;
   }
-  
+
   const btn = document.getElementById('aiSearchBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Recherche...';
-  
+
   try {
     const res = await fetch('/api/search/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query })
     });
-    
+
     if (res.ok) {
       const data = await res.json();
       renderQuests(data.quests);
-      
+
       const suggestionEl = document.getElementById('aiSuggestion');
       if (data.suggestion) {
         suggestionEl.innerHTML = `<strong>💡 Suggestion IA:</strong> ${data.suggestion}`;
@@ -673,39 +734,72 @@ document.getElementById('aiSearchBtn')?.addEventListener('click', async () => {
 
 // Review Modal Logic
 let currentRating = 0;
+const stars = document.querySelectorAll('.star-rating-input span');
+
+function setPermanentRating(rating) {
+    currentRating = rating;
+    // Update the 'selected' class on all stars to reflect the permanent rating
+    stars.forEach(s => {
+        const starValue = parseInt(s.dataset.value, 10);
+        s.classList.toggle('selected', starValue <= rating);
+    });
+}
+
+stars.forEach(star => {
+    star.addEventListener('click', () => {
+        const rating = parseInt(star.dataset.value, 10);
+        setPermanentRating(rating);
+        logInteraction(`User rated: ${rating} stars`, 'success');
+    });
+
+    star.addEventListener('mouseover', () => {
+        const hoverValue = parseInt(star.dataset.value, 10);
+        // Add hover class to stars up to the one being hovered over
+        stars.forEach(s => {
+            const starValue = parseInt(s.dataset.value, 10);
+            if (starValue <= hoverValue) {
+                s.classList.add('hover');
+            } else {
+                s.classList.remove('hover');
+            }
+        });
+    });
+});
+
+// Remove hover effect when the mouse leaves the star rating area
+const starRatingInput = document.querySelector('.star-rating-input');
+if (starRatingInput) {
+    starRatingInput.addEventListener('mouseout', () => {
+        stars.forEach(s => s.classList.remove('hover'));
+    });
+}
+
+
 function openReviewModal(questId, targetUserId) {
+  logInteraction(`Opening review modal for quest ${questId}`, 'ui');
   const modal = document.getElementById('reviewModal');
   const form = document.getElementById('reviewForm');
   form.reset();
   form.querySelector('[name="questId"]').value = questId;
   form.querySelector('[name="targetUserId"]').value = targetUserId;
-  
+
   // You might want to fetch quest title here if not available
   document.getElementById('reviewQuestTitle').textContent = `ID: ${questId}`;
 
-  // Reset stars
-  currentRating = 0;
-  const stars = modal.querySelectorAll('.star-rating-input span');
-  stars.forEach(star => star.classList.remove('selected'));
+  // Reset stars to reflect a 0 rating
+  setPermanentRating(0);
 
   modal.classList.remove('hidden');
 }
 
 function closeReviewModal() {
+  logInteraction('Closing review modal', 'ui');
   document.getElementById('reviewModal').classList.add('hidden');
 }
 
-document.querySelectorAll('.star-rating-input span').forEach(star => {
-  star.addEventListener('click', () => {
-    currentRating = parseInt(star.dataset.value, 10);
-    document.querySelectorAll('.star-rating-input span').forEach(s => {
-      s.classList.toggle('selected', parseInt(s.dataset.value, 10) <= currentRating);
-    });
-  });
-});
-
 document.getElementById('reviewForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
+  logInteraction('Review form submitted', 'success');
   if (currentRating === 0) {
     toast('Veuillez sélectionner une note (1 à 5 étoiles).');
     return;
@@ -738,12 +832,14 @@ function setupWebSocket() {
   const ws = new WebSocket(`${protocol}//${window.location.host}`);
 
   ws.onopen = () => {
+    logInteraction('WebSocket connection established', 'success');
     console.log('WebSocket connection established');
   };
 
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      logInteraction(`WebSocket message received: ${data.type}`, 'special');
       console.log('WebSocket message received:', data);
 
       // Refresh the main quest list for any quest-related change
@@ -772,6 +868,7 @@ function setupWebSocket() {
   };
 
   ws.onclose = () => {
+    logInteraction('WebSocket connection closed. Reconnecting...', 'warning');
     console.log('WebSocket connection closed. Attempting to reconnect in 5s...');
     setTimeout(setupWebSocket, 5000);
   };
@@ -784,7 +881,7 @@ function setupAiChat() {
   const closeBtn = document.getElementById('closeAiChat');
   const form = document.getElementById('aiChatForm');
   const input = document.getElementById('aiChatInput');
-  const messagesContainer = document.getElemencryId('aiChatMessages');
+  const messagesContainer = document.getElementById('aiChatMessages');
 
   if (!opener || !widget || !closeBtn || !form) {
     console.error('One or more AI chat elements are missing from the DOM.');
@@ -806,6 +903,7 @@ function setupAiChat() {
   }
 
   opener.addEventListener('click', () => {
+    logInteraction('AI Chat widget opened', 'special');
     widget.classList.remove('hidden');
     opener.classList.add('hidden');
     if (messagesContainer.children.length === 0) {
@@ -815,6 +913,7 @@ function setupAiChat() {
   });
 
   closeBtn.addEventListener('click', () => {
+    logInteraction('AI Chat widget closed', 'special');
     widget.classList.add('hidden');
     opener.classList.remove('hidden');
   });
@@ -824,6 +923,7 @@ function setupAiChat() {
     const userMessage = input.value.trim();
     if (!userMessage) return;
 
+    logInteraction('AI Chat message sent', 'special');
     addMessage(userMessage, 'user');
     input.value = '';
     const loadingIndicator = addMessage('', 'ai', true);
@@ -836,20 +936,26 @@ function setupAiChat() {
       });
       const data = await res.json();
       loadingIndicator.remove();
-      addMessage(data.reply, 'ai');
+
+      if (res.ok) {
+        addMessage(data.reply, 'ai');
+      } else {
+        addMessage(`Erreur: ${data.error || "Une erreur s'est produite."}`, 'ai');
+      }
     } catch (err) {
       loadingIndicator.remove();
-      addMessage("Désolé, une erreur s'est produite. Veuillez réessayer.", 'ai');
+      addMessage("Désolé, une erreur réseau s'est produite. Veuillez réessayer.", 'ai');
       console.error('AI Chat Error:', err);
     }
   });
 }
 
-document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click', ()=>navigate(b.dataset.target)));
+document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => navigate(b.dataset.target)));
 
 // init
-
+logInteraction('Application initialization', 'special');
 setupWebSocket(); // Initialize WebSocket connection
+setupAiChat(); // Initialize AI Chat
 // Set background video playback speed
 const bgVideo = document.getElementById('bgVideo');
 if (bgVideo) {
@@ -858,17 +964,24 @@ if (bgVideo) {
 
 // Auth UI
 document.getElementById('loginBtn')?.addEventListener('click', () => {
+  logInteraction('Login button clicked', 'auth');
   navigate('login');
 });
 document.getElementById('signupBtn')?.addEventListener('click', () => {
+  logInteraction('Signup button clicked', 'auth');
   navigate('signup');
 });
 
-document.getElementById('notificationBell')?.addEventListener('click', openNotificationModal);
+document.getElementById('notificationBell')?.addEventListener('click', () => {
+    openNotificationModal();
+    logInteraction('Notification bell clicked', 'ui');
+});
+
 
 // Fake login/signup (tu mettras ton backend plus tard)
 document.getElementById('loginForm')?.addEventListener('submit', async e => {
   e.preventDefault();
+  logInteraction('Login form submitted', 'auth');
   const email = document.querySelector('#loginForm input[name="email"]').value;
   const password = document.querySelector('#loginForm input[name="password"]').value;
   try {
@@ -894,12 +1007,13 @@ document.getElementById('loginForm')?.addEventListener('submit', async e => {
 
 document.getElementById('signupForm')?.addEventListener('submit', async e => {
   e.preventDefault();
+  logInteraction('Signup form submitted', 'auth');
   const username = document.querySelector('#signupForm input[name="username"]').value;
   const email = document.querySelector('#signupForm input[name="email"]').value;
   const phone = document.querySelector('#signupForm input[name="phone"]').value;
   const password = document.querySelector('#signupForm input[name="password"]').value;
   const confirmPassword = document.querySelector('#signupForm input[name="confirmPassword"]').value;
-  
+
   try {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
@@ -922,6 +1036,7 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
 });
 
 document.getElementById('analyzeLogsBtn')?.addEventListener('click', async () => {
+  logInteraction('Analyze logs button clicked', 'special');
   const code = prompt("Entrez le code d'administrateur :");
   if (code === 'TAVN0375') {
     try {
@@ -930,8 +1045,10 @@ document.getElementById('analyzeLogsBtn')?.addEventListener('click', async () =>
         const logs = await res.text();
         document.getElementById('analysisOutput').textContent = logs;
         document.getElementById('analysisResult').classList.remove('hidden');
+        logInteraction('Admin logs loaded successfully', 'success');
       } else {
         toast('Erreur de chargement des logs');
+        logInteraction('Admin logs failed to load', 'error');
       }
     } catch (err) {
       console.error('Log fetch error:', err);
@@ -939,5 +1056,6 @@ document.getElementById('analyzeLogsBtn')?.addEventListener('click', async () =>
     }
   } else {
     toast('Code incorrect');
+    logInteraction('Admin log access: incorrect code entered', 'warning');
   }
 });

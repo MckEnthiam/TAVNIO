@@ -48,7 +48,7 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random()*1e9);
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     cb(null, unique + ext);
   }
@@ -329,7 +329,7 @@ app.post('/api/search/ai', async (req, res) => {
       return res.status(400).json({ error: 'Query required' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const questsList = db.data.quests.map(q => ({
       id: q.id,
       title: q.title,
@@ -386,7 +386,12 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    if (GEMINI_API_KEY === 'AIzaSyC3ib6Kg1RnqjT5R8Sx7ax8Ew1v8nxsyr0') {
+      console.warn('WARNING: Using default example API key. AI requests will likely fail.');
+      return res.status(500).json({ error: 'Server is using a default invalid API key. Please configure a valid GEMINI_API_KEY in .env' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `You are TAVNO-AI, a friendly and helpful assistant for a quest-finding web app called TAVNO.
 
@@ -406,7 +411,13 @@ Your response:`;
     res.json({ reply: text });
   } catch (err) {
     console.error('AI chat error:', err);
-    res.status(500).json({ error: 'AI chat failed', details: err.message });
+    let errorMessage = 'AI chat failed';
+    if (err.message && err.message.includes('API key not valid')) {
+      errorMessage = 'Invalid API Key configured on server.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    res.status(500).json({ error: errorMessage, details: err.message });
   }
 });
 
@@ -440,11 +451,11 @@ app.post('/api/auth/login', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-  res.json({ 
-    token: `token_${user.id}_${Date.now()}`, 
-    id: user.id, 
-    name: user.name, 
-    email: user.email, 
+  res.json({
+    token: `token_${user.id}_${Date.now()}`,
+    id: user.id,
+    name: user.name,
+    email: user.email,
     balance: user.balance,
     bio: user.bio || '',
     avatar: user.avatar || '/avatars/default.png',
@@ -454,36 +465,36 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/signup', async (req, res) => {
   const { email, password, confirmPassword, username, phone } = req.body;
-  
+
   // Validation
   if (!email || !password || !username) return res.status(400).json({ error: 'Tous les champs sont requis' });
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
   if (password !== confirmPassword) return res.status(400).json({ error: 'Les mots de passe ne correspondent pas' });
   if (db.data.users.find(u => u.email === email)) return res.status(400).json({ error: 'Cet email est déjà utilisé' });
   if (db.data.users.find(u => u.name === username)) return res.status(400).json({ error: 'Ce nom d\'utilisateur est déjà pris' });
-  
+
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const newUser = { 
-    id: db.data.users.length + 1, 
-    name: username, 
-    email, 
+  const newUser = {
+    id: db.data.users.length + 1,
+    name: username,
+    email,
     password: hashedPassword,
-    balance: 0, 
-    bio: '', 
+    balance: 0,
+    bio: '',
     avatar: '/avatars/default.png',
     phone: phone || '',
     notifications: [] // Initialize notifications for new users
   };
   db.data.users.push(newUser);
   await db.write();
-  res.json({ 
-    token: `token_${newUser.id}_${Date.now()}`, 
-    id: newUser.id, 
-    name: newUser.name, 
-    email: newUser.email, 
-    balance: newUser.balance, 
-    bio: newUser.bio, 
+  res.json({
+    token: `token_${newUser.id}_${Date.now()}`,
+    id: newUser.id,
+    name: newUser.name,
+    email: newUser.email,
+    balance: newUser.balance,
+    bio: newUser.bio,
     avatar: newUser.avatar,
     phone: newUser.phone
   });
@@ -595,7 +606,7 @@ app.post('/api/reviews', authenticateUser, async (req, res) => {
 // TODO: This endpoint should be protected and only accessible by administrators.
 app.post('/api/admin/analyze-logs', async (req, res) => {
   const logFilePath = path.join(__dirname, 'suspicious_activities.log');
-  
+
   fs.readFile(logFilePath, 'utf8', async (err, data) => {
     if (err) {
       if (err.code === 'ENOENT') {
@@ -610,7 +621,7 @@ app.post('/api/admin/analyze-logs', async (req, res) => {
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const prompt = `You are a security analyst AI for a platform called TAVNO.
 The following is a log file of suspicious activities. Each line is a JSON object representing an event.
 

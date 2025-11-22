@@ -23,6 +23,17 @@
       "balance": 25500,
       "bio": "le compte de test principal",
       "avatar": "/uploads/1763155881389-163243838.jpg"
+    },
+    {
+      "id": 2,
+      "name": "didier.akossou@ipnetinstitute.com",
+      "email": "desirervainceur@hotmail.com",
+      "password": "$2b$10$lInquxNnr4hJC/DjNM4PRu8gdvV0K5N479LP.knyamkc3b3Tkpgii",
+      "balance": 0,
+      "bio": "",
+      "avatar": "/avatars/default.png",
+      "phone": "+228 90 00 98 77",
+      "notifications": []
     }
   ]
 }
