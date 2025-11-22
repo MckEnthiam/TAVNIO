@@ -18,7 +18,7 @@ function logInteraction(message, type = 'info') {
   console.log(`%c[Interaction] ${message}`, `color: ${color}; font-weight: bold;`);
 
   if (Math.random() < 0.15) { // 15% chance
-    console.log('%c✨ gemini says everything is okay ✨', 'color: #E91E63; font-style: italic;');
+    console.log('%c✨ TAVNO-AI says everything is okay ✨', 'color: #E91E63; font-style: italic;');
   }
 }
 
@@ -689,7 +689,7 @@ document.getElementById('categorySelect')?.addEventListener('change', () => {
   fetchQuests();
 });
 
-// AI Search functionality with Gemini
+// AI Search functionality (uses server-side AI if configured, otherwise local/pseudo mode)
 document.getElementById('aiSearchBtn')?.addEventListener('click', async () => {
   logInteraction('AI Search button clicked', 'special');
   const query = document.getElementById('searchInput')?.value || '';
@@ -937,8 +937,8 @@ function setupAiChat() {
     if (/aide|aidez|aider/.test(low)) return "Dites-moi ce dont vous avez besoin et je ferai de mon mieux pour aider.";
     if (/merci/.test(low)) return "Avec plaisir ! Si vous avez d'autres questions, je suis là.";
 
-    // Fallback: return null so the client will call the real AI endpoint
-    return null;
+    // Fallback: return a polite demo-mode reply so no external AI call is needed
+    return `Mode démo : TAVNO-AI fonctionne localement et n\'utilise pas de service externe. Vous avez dit : "${m}". Pouvez-vous préciser ce dont vous avez besoin ?`;
   }
 
   opener.addEventListener('click', () => {
@@ -966,39 +966,18 @@ function setupAiChat() {
     addMessage(userMessage, 'user');
     input.value = '';
 
-    // Pseudo-AI mode: try to generate a local reply first
+    // Pseudo-AI mode: always generate a local reply (no external AI calls)
     try {
       const pseudo = generatePseudoReply(userMessage);
-      if (pseudo) {
-        // small randomized thinking delay to feel realistic
-        const thinkDelay = 400 + Math.floor(Math.random() * 800);
-        const loading = addMessage('', 'ai', true);
-        setTimeout(() => {
-          loading.remove();
-          streamAiReply(pseudo, { typingSpeed: 20, preDelay: 120 });
-        }, thinkDelay);
-        return;
-      }
-
-      // No local pseudo reply: fall back to real AI endpoint
-      const loadingIndicator = addMessage('', 'ai', true);
-
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage })
-      });
-      const data = await res.json();
-      loadingIndicator.remove();
-
-      if (res.ok) {
-        // Use streaming display for real replies, too
-        streamAiReply(data.reply || (data.result || ''), { typingSpeed: 18, preDelay: 100 });
-      } else {
-        addMessage(`Erreur: ${data.error || "Une erreur s'est produite."}`, 'ai');
-      }
+      // small randomized thinking delay to feel realistic
+      const thinkDelay = 400 + Math.floor(Math.random() * 800);
+      const loading = addMessage('', 'ai', true);
+      setTimeout(() => {
+        loading.remove();
+        streamAiReply(pseudo, { typingSpeed: 20, preDelay: 120 });
+      }, thinkDelay);
     } catch (err) {
-      addMessage("Désolé, une erreur réseau s'est produite. Veuillez réessayer.", 'ai');
+      addMessage("Désolé, une erreur interne s'est produite.", 'ai');
       console.error('AI Chat Error:', err);
     }
   });
@@ -1167,16 +1146,16 @@ function generateFakeLogs(count = 80) {
     lines.push(line);
   }
 
-  // Occasionally prepend a reassuring Gemini status line for demo
+  // Occasionally prepend a reassuring TAVNO-AI status line for demo
   if (Math.random() < 0.45) {
-    const geminiVariants = [
-      '✨ gemini says: No suspicious activity detected ✨',
-      '✨ gemini: everything looks normal — no suspicious activity ✨',
-      '✨ gemini indique : aucune activité suspecte détectée ✨',
-      '✨ gemini says there is no suspicious activity ✨'
+    const bannerVariants = [
+      '✨ TAVNO-AI says: No suspicious activity detected ✨',
+      '✨ TAVNO-AI: everything looks normal — no suspicious activity ✨',
+      '✨ TAVNO-AI indique : aucune activité suspecte détectée ✨',
+      '✨ TAVNO-AI says there is no suspicious activity ✨'
     ];
-    const geminiLine = geminiVariants[Math.floor(Math.random() * geminiVariants.length)];
-    lines.unshift(geminiLine);
+    const bannerLine = bannerVariants[Math.floor(Math.random() * bannerVariants.length)];
+    lines.unshift(bannerLine);
   }
 
   // Add a header with system info

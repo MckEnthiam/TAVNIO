@@ -32,14 +32,19 @@ function parseDurationToMinutes(durationStr) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-// Fail fast if critical environment variables are missing
-if (!GEMINI_API_KEY) {
-  console.error('FATAL ERROR: GEMINI_API_KEY environment variable is not set.');
-  process.exit(1);
+let genAI = null;
+const hasGemini = !!GEMINI_API_KEY;
+if (hasGemini) {
+  try {
+    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    console.log('Gemini API initialized.');
+  } catch (e) {
+    console.warn('Failed to initialize Gemini client, falling back to pseudo-AI mode.', e.message || e);
+    genAI = null;
+  }
+} else {
+  console.log('GEMINI_API_KEY not set — running in pseudo-AI mode.');
 }
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 
 // Storage for uploads
@@ -321,15 +326,21 @@ app.delete('/api/quests/:id', authenticateUser, async (req, res) => {
   res.json({ success: true });
 });
 
-// AI search endpoint for quest recommendations using Gemini
+// AI search endpoint for quest recommendations (external AI if configured, otherwise local pseudo-mode)
 app.post('/api/search/ai', async (req, res) => {
   try {
     const { query } = req.body;
     if (!query || query.trim().length === 0) {
       return res.status(400).json({ error: 'Query required' });
     }
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    if (!genAI) {
+      // Basic pseudo search fallback: simple keyword match + suggestion
+      const q = query.toLowerCase();
+      const recommendedIds = db.data.quests.filter(qq => (qq.title + ' ' + qq.description).toLowerCase().includes(q)).map(qq => qq.id);
+      const suggestion = recommendedIds.length === 0 ? 'Essayez des mots-clés différents, par ex. "livraison" ou "achats".' : '';
+      const recommendedQuests = db.data.quests.filter(qt => recommendedIds.includes(qt.id));
+      return res.json({ quests: recommendedQuests, suggestion, reasoning: 'Résultats générés localement (mode démo).' });
+    }
     const questsList = db.data.quests.map(q => ({
       id: q.id,
       title: q.title,
@@ -385,10 +396,15 @@ app.post('/api/ai/chat', async (req, res) => {
     if (!message || message.trim().length === 0) {
       return res.status(400).json({ error: 'Message is required' });
     }
-
-    if (GEMINI_API_KEY === 'AIzaSyC3ib6Kg1RnqjT5R8Sx7ax8Ew1v8nxsyr0') {
-      console.warn('WARNING: Using default example API key. AI requests will likely fail.');
-      return res.status(500).json({ error: 'Server is using a default invalid API key. Please configure a valid GEMINI_API_KEY in .env' });
+    if (!genAI) {
+      // Server-side pseudo chat fallback
+      const m = message.trim();
+      let reply = 'Mode démo : TAVNO-AI fonctionne localement et n\'utilise pas de service externe. ';
+      if (/bonjour|salut|bonsoir/i.test(m)) reply += 'Bonjour ! Comment puis-je vous aider aujourd\'hui ?';
+      else if (/quête|quêtes|quest/i.test(m)) reply += 'Je peux vous aider à trouver ou publier des quêtes. Que recherchez-vous ?';
+      else if (/merci|merci beaucoup/i.test(m)) reply += 'Avec plaisir !';
+      else reply += `Vous avez dit : "${m}" — pouvez-vous préciser ?`;
+      return res.json({ reply });
     }
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -621,6 +637,23 @@ app.post('/api/admin/analyze-logs', async (req, res) => {
     }
 
     try {
+      if (!genAI) {
+        // Basic local analysis fallback for demo
+        const lines = data.split(/\r?\n/).filter(Boolean);
+        const total = lines.length;
+        const errorCount = lines.filter(l => /ERROR/i.test(l)).length;
+        const warnCount = lines.filter(l => /WARN/i.test(l)).length;
+        const infoCount = total - errorCount - warnCount;
+        const users = {};
+        lines.forEach(l => {
+          const m = l.match(/userId=(\d+)/);
+          if (m) users[m[1]] = (users[m[1]] || 0) + 1;
+        });
+        const topUsers = Object.entries(users).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const analysis = `Local analysis (demo mode): total=${total}, errors=${errorCount}, warnings=${warnCount}, info=${infoCount}. Top users: ${topUsers.map(u=>u.join(':')).join(', ')}`;
+        return res.json({ analysis });
+      }
+
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const prompt = `You are a security analyst AI for a platform called TAVNO.
 The following is a log file of suspicious activities. Each line is a JSON object representing an event.
