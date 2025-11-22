@@ -902,6 +902,45 @@ function setupAiChat() {
     return msgDiv;
   }
 
+  // Streamed/typed AI reply to simulate a real AI typing
+  function streamAiReply(text, options = {}) {
+    const typingSpeed = options.typingSpeed || 25; // ms per char
+    const preDelay = options.preDelay || 600; // ms before typing starts
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('ai-chat-message', 'ai');
+    messagesContainer.appendChild(msgDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    setTimeout(() => {
+      let i = 0;
+      const t = setInterval(() => {
+        msgDiv.textContent += text.charAt(i);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        i++;
+        if (i >= text.length) clearInterval(t);
+      }, typingSpeed);
+    }, preDelay);
+    return msgDiv;
+  }
+
+  // Simple rule-based pseudo-AI generator for presentation/demo purposes
+  function generatePseudoReply(message) {
+    const m = message.trim();
+    const low = m.toLowerCase();
+
+    // Exact trigger (presentation)
+    if (low === 'tiens voici un test') return 'Comment puis-je vous aider ?';
+
+    // Some simple pattern-based replies
+    if (/bonjour|salut|bonsoir/.test(low)) return "Bonjour ! Je suis l'assistant TAVNO-AI. Comment puis-je vous aider ?";
+    if (/qu[eé]te|quêtes|questes/.test(low)) return "Je peux chercher des quêtes pour vous ou vous aider à en publier une. Que souhaitez-vous ?";
+    if (/aide|aidez|aider/.test(low)) return "Dites-moi ce dont vous avez besoin et je ferai de mon mieux pour aider.";
+    if (/merci/.test(low)) return "Avec plaisir ! Si vous avez d'autres questions, je suis là.";
+
+    // Fallback: return null so the client will call the real AI endpoint
+    return null;
+  }
+
   opener.addEventListener('click', () => {
     logInteraction('AI Chat widget opened', 'special');
     widget.classList.remove('hidden');
@@ -926,9 +965,24 @@ function setupAiChat() {
     logInteraction('AI Chat message sent', 'special');
     addMessage(userMessage, 'user');
     input.value = '';
-    const loadingIndicator = addMessage('', 'ai', true);
 
+    // Pseudo-AI mode: try to generate a local reply first
     try {
+      const pseudo = generatePseudoReply(userMessage);
+      if (pseudo) {
+        // small randomized thinking delay to feel realistic
+        const thinkDelay = 400 + Math.floor(Math.random() * 800);
+        const loading = addMessage('', 'ai', true);
+        setTimeout(() => {
+          loading.remove();
+          streamAiReply(pseudo, { typingSpeed: 20, preDelay: 120 });
+        }, thinkDelay);
+        return;
+      }
+
+      // No local pseudo reply: fall back to real AI endpoint
+      const loadingIndicator = addMessage('', 'ai', true);
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -938,12 +992,12 @@ function setupAiChat() {
       loadingIndicator.remove();
 
       if (res.ok) {
-        addMessage(data.reply, 'ai');
+        // Use streaming display for real replies, too
+        streamAiReply(data.reply || (data.result || ''), { typingSpeed: 18, preDelay: 100 });
       } else {
         addMessage(`Erreur: ${data.error || "Une erreur s'est produite."}`, 'ai');
       }
     } catch (err) {
-      loadingIndicator.remove();
       addMessage("Désolé, une erreur réseau s'est produite. Veuillez réessayer.", 'ai');
       console.error('AI Chat Error:', err);
     }
@@ -1040,22 +1094,92 @@ document.getElementById('analyzeLogsBtn')?.addEventListener('click', async () =>
   const code = prompt("Entrez le code d'administrateur :");
   if (code === 'TAVN0375') {
     try {
-      const res = await fetch('/api/logs');
-      if (res.ok) {
-        const logs = await res.text();
-        document.getElementById('analysisOutput').textContent = logs;
-        document.getElementById('analysisResult').classList.remove('hidden');
-        logInteraction('Admin logs loaded successfully', 'success');
-      } else {
-        toast('Erreur de chargement des logs');
-        logInteraction('Admin logs failed to load', 'error');
-      }
+      // Generate polished fake logs for presentation/demo
+      const logs = generateFakeLogs(120);
+      document.getElementById('analysisOutput').textContent = logs.join('\n');
+      document.getElementById('analysisResult').classList.remove('hidden');
+      logInteraction('Admin logs (fake/demo) loaded successfully', 'success');
     } catch (err) {
-      console.error('Log fetch error:', err);
+      console.error('Fake log generate error:', err);
       toast('Erreur de chargement des logs');
+      logInteraction('Admin logs failed to load', 'error');
     }
   } else {
     toast('Code incorrect');
     logInteraction('Admin log access: incorrect code entered', 'warning');
   }
 });
+
+// Fake log generator for admin demo
+function generateFakeLogs(count = 80) {
+  const sev = ['INFO', 'INFO', 'INFO', 'WARN', 'WARN', 'ERROR'];
+  const templates = [
+    (t, s, details) => `${t} [${s}] [auth] userId=${details.userId} ip=${details.ip} - ${details.msg}` ,
+    (t, s, details) => `${t} [${s}] [api] ${details.method} ${details.path} status=${details.status} rt=${details.rt}ms trace=${details.trace}` ,
+    (t, s, details) => `${t} [${s}] [db] query="${details.query}" duration=${details.duration}ms conn=${details.connId}` ,
+    (t, s, details) => `${t} [${s}] [worker] job=${details.job} took=${details.duration}ms result=${details.result}` ,
+    (t, s, details) => `${t} [${s}] [security] ip=${details.ip} reason="${details.msg}" risk=${details.risk}`
+  ];
+
+  function rand(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function ip(){ return `${randInt(10,195)}.${randInt(0,255)}.${randInt(0,255)}.${randInt(1,254)}`; }
+  function trace(){ return Math.random().toString(36).slice(2,10); }
+  function timestamp(offsetMs=0){ return new Date(Date.now() - offsetMs).toISOString(); }
+
+  const lines = [];
+  for(let i=0;i<count;i++){
+    const t = timestamp(randInt(1000, 1000*60*60*24));
+    const s = rand(sev);
+    const tpl = rand(templates);
+    const details = {};
+    // populate details based on chosen template
+    details.userId = randInt(1000, 9999);
+    details.ip = ip();
+    details.msg = rand([
+      'Connexion réussie',
+      'Échec d’authentification: mot de passe incorrect',
+      'Compte verrouillé après 5 tentatives',
+      'Mot de passe réinitialisé',
+      'Token rafraîchi',
+      'Accès administrateur accordé'
+    ]);
+    details.method = rand(['GET','POST','PUT','DELETE']);
+    details.path = rand(['/api/quests','/api/auth/login','/api/user/profile','/api/search/ai','/api/quests/42/complete']);
+    details.status = rand([200,200,200,201,204,400,401,403,404,500]);
+    details.rt = randInt(10, 1200);
+    details.trace = trace();
+    details.query = rand(['SELECT * FROM quests WHERE id=?','UPDATE users SET balance=? WHERE id=?','INSERT INTO logs (msg) VALUES (?)']);
+    details.connId = `pg-${randInt(1,12)}`;
+    details.duration = randInt(5, 3500);
+    details.job = rand(['sendEmail','recalculateRatings','processUploads','cleanupTemp']);
+    details.result = rand(['ok','ok','ok','failed','partial']);
+    details.risk = (Math.random()*1.5).toFixed(2);
+
+    // Occasionally inject a security alert
+    if (Math.random() < 0.06) {
+      const sec = `${t} [ERROR] [security] ip=${details.ip} reason="Tentative d'injection détectée" risk=${(2+Math.random()*3).toFixed(2)} trace=${trace()}`;
+      lines.push(sec);
+      continue;
+    }
+
+    const line = tpl(t, s, details);
+    lines.push(line);
+  }
+
+  // Occasionally prepend a reassuring Gemini status line for demo
+  if (Math.random() < 0.45) {
+    const geminiVariants = [
+      '✨ gemini says: No suspicious activity detected ✨',
+      '✨ gemini: everything looks normal — no suspicious activity ✨',
+      '✨ gemini indique : aucune activité suspecte détectée ✨',
+      '✨ gemini says there is no suspicious activity ✨'
+    ];
+    const geminiLine = geminiVariants[Math.floor(Math.random() * geminiVariants.length)];
+    lines.unshift(geminiLine);
+  }
+
+  // Add a header with system info
+  const header = `# System TAVNO - logs snapshot - generated=${new Date().toISOString()}`;
+  return [header, ...lines];
+}
